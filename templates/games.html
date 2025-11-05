@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='pics/icon0.png') }}">
+    <title>Saved Games</title>
+</head>
+<body style="background-color:#0b0c10; color:#66fcf1;">
+    <h1>Last 2 weeks games</h1>
+    <table border="1" cellpadding="6">
+        <tr>
+            <th>id</th>
+            <th>Name</th>
+            <th>playtime_2weeks (hours)</th>
+            <th>playtime_forever (hours)</th>
+        </tr>
+        {% for g in games %}
+        <tr>
+            <td>{{ g.id }}</td>
+            <td>{{ g.name }}</td>
+            <td>{{ (g.play_time_2weeks / 60) | round(1) }}</td>
+            <td>{{ (g.playtime_forever / 60) | round(1) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

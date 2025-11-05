@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='pics/icon0.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/service-worker.js')
+            .then(() => console.log('Service Worker registered'))
+            .catch(err => console.error('Registration error SW:', err));
+        }
+    </script>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Steam Tracker">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='pics/icon0.png') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Steam Tracker</title>
+</head>
+
+<body style="background-color:#0b0c10; color:#66fcf1; font-family:sans-serif; text-align:center;">
+    <h1 class="text-3xl font-bold mb-4">Steam Statistics</h1>
+    <p class="mb-4">Here you can see what games have been played over the last two weeks</p>
+    <ul style="list-style-type: none; padding: 0; margin: 0;">
+        {% for game in games %}
+            <li>{{ game.name }} - {{ (game.playtime_2weeks / 60)|round(1)}} h</li>
+        {% endfor %}
+    </ul>
+
+    <nav class="fixed left-0 right-0 bg-gray-900 text-white border-t border-gray-700 flex justify-around py-3"
+     style="bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);">
+
+        <a href="/games" class="flex flex-col items-center text-sm hover:text-green-400">
+            <span>More Info</span>
+        </a>
+        <a href="/dashboard" class="flex flex-col items-center text-sm hover:text-green-400">
+            <span>Dashboard</span>
+        </a>
+    </nav>
+</body>
+</html>

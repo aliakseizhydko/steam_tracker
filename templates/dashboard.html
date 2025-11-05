@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Tracker Statistics</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='pics/icon0.png') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body { background:#0b0c10; color:#66fcf1; font-family:sans-serif; margin:0; padding:0; }
+      h1,h2 { text-align:center; margin-top:25px; }
+      .container { width:90%; max-width:1000px; margin:0 auto; padding:20px; }
+      .section { background:#0f111a; border-radius:12px; padding:20px; margin-top:30px; box-shadow:0 6px 18px rgba(0,0,0,0.6); }
+      table { width:100%; margin-top:16px; border-collapse:collapse; color:#e6f7ff; }
+      th,td { padding:8px 10px; border-bottom:1px solid #122; text-align:left; }
+      .friends { display:flex; flex-direction:column; gap:10px; }
+      .friend { display:flex; align-items:center; gap:10px; background:#111726; padding:8px; border-radius:8px; }
+      .friend img { width:40px; height:40px; border-radius:50%; }
+      .more { color:#ff6666; }
+      .less { color:#4cff4c; }
+    </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Steam Tracker Dashboard</h1>
+
+    <div class="section">
+      <h2>Your activity for the week</h2>
+      <canvas id="statsChart" height="120"></canvas>
+      <table>
+        <thead><tr><th>Game</th><th>Hours added</th></tr></thead>
+        <tbody>
+          {% for row in stats %}
+            <tr><td>{{ row.name }}</td><td>{{ row.hours }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Comparison with friends (2 weeks)</h2>
+      <p>Your time: {{ me|round(1) }} h</p>
+      <div class="friends">
+        {% for f in comparisons %}
+          <div class="friend">
+            <img src="{{ f.avatar }}" alt="">
+            <div style="flex:1;text-align:left;">{{ f.name }}</div>
+            <div>{{ f.friend_hours }} h</div>
+            {% if f.diff > 0 %}
+              <div class="more">+{{ f.diff }} h more</div>
+            {% elif f.diff < 0 %}
+              <div class="less">{{ f.diff }} h less</div>
+            {% else %}
+              <div>(equal)</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const labels = {{ labels|tojson }};
+    const values = {{ values|tojson }};
+    new Chart(document.getElementById('statsChart'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Hours for the week',
+          data: values,
+          borderWidth: 1,
+          backgroundColor: 'rgba(102,204,255,0.35)',
+          borderColor: 'rgba(102,204,255,0.9)'
+        }]
+      },
+      options: { responsive:true, scales:{ y:{ beginAtZero:true, title:{ display:true, text:'Hours'} } } }
+    });
+  </script>
+</body>
+</html>
