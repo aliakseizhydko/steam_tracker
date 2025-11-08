@@ -42,6 +42,7 @@ def save_games_to_db(games_list):
     old_games = PlayedGame.query.filter(~PlayedGame.name.in_(current_games)).all()
     
     for game in old_games:
+        GameSnapshot.query.filter_by(game_id=game.id).delete()
         db.session.delete(game)
         deleted += 1
     
@@ -65,7 +66,7 @@ def save_games_to_db(games_list):
             updated += 1
     
     # ???????
-    db.session.commit()
+    # db.session.commit()
     
     for g in games_list:
         name = g.get("name")
@@ -165,6 +166,7 @@ def scheduled_update():
             result = save_games_to_db(games)
             print(f"Updated: {result}")
         except Exception as e:
+            db.session.rollback()
             print(f"That was fuck up: {e}")
             
 scheduler = BackgroundScheduler()
@@ -184,12 +186,6 @@ scheduler.add_job(
     id="daily_stat_job",
     replace_existing=True
 )
-
-if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
-    scheduler.start()
-    print("The automatic update scheduler is enabled (60-minute interval)")
-else:
-    print("The scheduler is disabled")
 
 def update_friends():
     url = "http://api.steampowered.com/ISteamUser/GetFriendList/v0001/"
@@ -297,7 +293,13 @@ def dashboard():
     return render_template("dashboard.html", stats=stats_data, labels=labels, values=values, me=my_total, comparisons=comparisons)
     
 if __name__ == "__main__":
+    if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
+        scheduler.start()
+        print("Scheduler enabled")
+        
     app.run(
             host="0.0.0.0",
             port=int(os.getenv("PORT", 5000)),
-            debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")
+            debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
+            threaded=True,
+            use_reloader=False)
