@@ -1,0 +1,3 @@
+{
+  "postDeploy": "flask init-db"
+}
