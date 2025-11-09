@@ -234,7 +234,6 @@ def update_friends_route():
 
 @app.route('/dashboard')
 def dashboard():
-    update_daily_stat()
     # Statistics for the week
     weeak_ago = datetime.utcnow() - timedelta(days=7)
     snapshots = GameSnapshot.query.filter(GameSnapshot.create_at >= weeak_ago).all()
