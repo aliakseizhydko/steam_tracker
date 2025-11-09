@@ -17,6 +17,25 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='pics/icon0.png') }}">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.pushManager.getSubscription().then(existing => {
+                if (existing) return existing;
+                return registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: "{{ vapid_public_key }}"
+                });
+            }).then(subscription => {
+                fetch('/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription.toJSON())
+                });
+            }).catch(err => console.error('Push subscribe error:', err));
+        });
+    }
+    </script>
     <title>Steam Tracker</title>
 </head>
 

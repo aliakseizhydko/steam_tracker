@@ -41,3 +41,15 @@ class DailyStat(db.Model):
     
     def __repr__(self):
         return f"<DailyStat {self.date} - {self.total_minutes} min>"
+    
+class PushSubscription(db.Model):
+    __tablename__ = 'push_subscriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh = db.Column(db.Text, nullable=False)
+    auth = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<PushSub {self.endpoint[:50]}...>"

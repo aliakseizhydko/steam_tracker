@@ -1,9 +1,10 @@
-import requests, os, random
-from flask import Flask, render_template, jsonify
-from models import db, PlayedGame, GameSnapshot, Friend, DailyStat
+import requests, os, random, json
+from flask import Flask, render_template, jsonify, request
+from models import db, PlayedGame, GameSnapshot, Friend, DailyStat, PushSubscription
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
+from pywebpush import webpush, WebPushException
 
 app = Flask(__name__)
 
@@ -19,7 +20,7 @@ db.init_app(app)
 @app.cli.command("init-db")
 def init_db_command():
     with app.app_context():
-        db.create_all()
+        db.create_all()   
 
 @app.route('/')
 def home():
@@ -31,7 +32,7 @@ def home():
     }
     response = requests.get(url, params=params)
     games = response.json().get("response", {}).get("games", [])
-    return render_template("index.html", games=games)
+    return render_template("index.html", games=games, vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
 
 def save_games_to_db(games_list):
     saved = 0
@@ -143,6 +144,10 @@ def update_daily_stat():
         ]
         
     message = random.choice(phrases)
+    
+    # Need check later
+    if total_minutes > 0:
+        send_push("Push is here!", stat.message)
     
     stat = DailyStat(date=yesterday, total_minutes=int(total_minutes), message=message)
     db.session.merge(stat)
@@ -291,7 +296,62 @@ def dashboard():
     values = [row["hours"] for row in stats_data]
     
     return render_template("dashboard.html", stats=stats_data, labels=labels, values=values, me=my_total, comparisons=comparisons)
+
+@app.route('/subscribe', methods=['POST'])
+def subscribe():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data"}), 400
     
+    endpoint = data.get('endpoint')
+    p256dh = data.get('keys', {}).get('p256dh')
+    auth = data.get('keys', {}).get('auth')
+    
+    if not all([endpoint, p256dh, auth]):
+        return jsonify({"error": "Missing keys"}), 400
+    
+    existing = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if existing:
+        return jsonify({"status": "already_exists"})
+
+    sub = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth)
+    db.session.add(sub)
+    db.session.commit()
+    
+    return jsonify({"status": "subscripted"})
+
+def send_push(title, body):
+    subscriptions = PushSubscription.query.all()
+    if not subscriptions:
+        print("No push subscriptions :(")
+        return
+    
+    payload = json.dumps({
+        "title": title,
+        "body": body,
+        "icon": "/static/pics/icon0.png"
+    })
+    
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {
+                        "p256dh": sub.p256dh,
+                        "auth": sub.auth
+                    }
+                },
+                data=payload,
+                vapid_private_key=os.getenv("VAPID_PRIVATE_KEY"),
+                vapid_claims={
+                    "sub": f"mailto:{os.getenv('VAPID_ADMIN_EMAIL')}"
+                }
+            )
+            print(f"Push sent to {sub.endpoint[:60]}...")
+        except WebPushException as e:
+            print(f"Push failed: {e}")
+
 if __name__ == "__main__":
     if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
         scheduler.start()
