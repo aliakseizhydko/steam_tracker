@@ -351,11 +351,12 @@ def send_push(title, body):
             print(f"Push sent to {sub.endpoint[:60]}...")
         except WebPushException as e:
             print(f"Push failed: {e}")
+            
+if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
+    scheduler.start()
+    print("Scheduler enabled")
 
 if __name__ == "__main__":
-    if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
-        scheduler.start()
-        print("Scheduler enabled")
         
     app.run(
             host="0.0.0.0",
