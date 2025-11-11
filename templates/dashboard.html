@@ -18,6 +18,7 @@
       .friend img { width:40px; height:40px; border-radius:50%; }
       .more { color:#ff6666; }
       .less { color:#4cff4c; }
+      .chart-container { height: 320px; position: relative; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -26,7 +27,9 @@
 
     <div class="section">
       <h2>Your activity for the week</h2>
-      <canvas id="statsChart" height="120"></canvas>
+      <div class="chart-container">
+        <canvas id="statsChart"></canvas>
+      </div>
       <table>
         <thead><tr><th>Game</th><th>Hours added</th></tr></thead>
         <tbody>
@@ -36,6 +39,46 @@
         </tbody>
       </table>
     </div>
+
+  <script>
+    const gameLabels = {{ labels|tojson }};
+    const gameHours = {{ values|tojson }};
+
+    const backgroundColors = gameHours.length > 0 ? 
+      gameHours.map((_, i) => `hsla(${(i * 137.508) % 360}, 80%, 65%, 0.8)`) : ['#2a2a2a'];
+
+    new Chart(document.getElementById('statsChart'), {
+      type: 'doughnut',
+      data: {
+        labels: gameHours.length > 0 ? gameLabels : ['No games this week'],
+        datasets: [{
+          data: gameHours.length > 0 ? gameHours : [1],
+          backgroundColor: backgroundColors,
+          borderColor: '#1f4068',
+          borderWidth: 2,
+          hoverOffset: 10
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#66fcf1', padding: 15 } },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                if (gameHours.length === 0) return 'No activity';
+                const value = context.parsed;
+                const total = context.dataset.data.reduce((a,b) => a+b, 0);
+                const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
+                return `${context.label}: ${value} h (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  </script>
 
     <div class="section">
       <h2>Comparison with friends (2 weeks)</h2>
@@ -58,24 +101,5 @@
       </div>
     </div>
   </div>
-
-  <script>
-    const labels = {{ labels|tojson }};
-    const values = {{ values|tojson }};
-    new Chart(document.getElementById('statsChart'), {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Hours for the week',
-          data: values,
-          borderWidth: 1,
-          backgroundColor: 'rgba(102,204,255,0.35)',
-          borderColor: 'rgba(102,204,255,0.9)'
-        }]
-      },
-      options: { responsive:true, scales:{ y:{ beginAtZero:true, title:{ display:true, text:'Hours'} } } }
-    });
-  </script>
 </body>
 </html>
