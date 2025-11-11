@@ -41,63 +41,50 @@
     </nav>
 </body>
 
+<button id="enablePush">Включить уведомления</button>
+
 <script>
-    const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
-    function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-    }
+document.getElementById("enablePush").addEventListener("click", async () => {
+  try {
+    const reg = await navigator.serviceWorker.register("/static/service-worker.js");
+    console.log("SW зарегистрирован:", reg);
 
-    async function registerServiceWorker() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.log("Push notifications are not supported");
-        return;
-    }
-
-    try {
-        const reg = await navigator.serviceWorker.register("/static/service-worker.js");
-        console.log("SW registered:", reg);
-
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-        console.log("Permission not granted");
-        return;
-        }
-
-        const existingSub = await reg.pushManager.getSubscription();
-        if (existingSub) {
-            console.log("Already subscribed:", existingSub);
-            return;
-        }
-
-        const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        });
-
-        await fetch("/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sub.toJSON())
-        });
-
-        console.log("Successfully subscribed", sub);
-        alert("Push notifications are on!");
-    } catch (err) {
-        console.error("Subscription error:", err);
-    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      alert("Разрешение не выдано");
+      return;
     }
 
-    registerServiceWorker();
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array("{{ vapid_public_key | safe }}")
+    });
+
+    await fetch("/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON())
+    });
+
+    alert("✅ Уведомления включены!");
+  } catch (err) {
+    console.error("Ошибка подписки:", err);
+  }
+});
 </script>
+
 
 </html>
