@@ -19,3 +19,22 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+self.addEventListener("push", (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || "Steam Tracker";
+  const options = {
+    body: data.body || "No message",
+    icon: data.icon || "/static/pics/icon0.png",
+    badge: "/static/pics/icon0.png",
+    vibrate: [200, 100, 200],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.openWindow("/")
+  );
+});

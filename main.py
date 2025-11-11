@@ -148,7 +148,7 @@ def update_daily_stat():
         
         # Need check later
         if total_minutes > 0:
-            send_push("Push is here!", stat.message)
+            send_push("Push is here!", message)
         
         stat = DailyStat(date=yesterday, total_minutes=int(total_minutes), message=message)
         db.session.merge(stat)
