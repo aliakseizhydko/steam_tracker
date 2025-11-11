@@ -41,63 +41,100 @@
     </nav>
 </body>
 
+<div class="text-center my-8">
+  <button id="togglePush" 
+          class="font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-300"
+          style="min-width: 280px;">
+    Checking status...
+  </button>
+  <p id="pushStatus" class="mt-4 text-gray-400"></p>
+</div>
+
 <script>
-    const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
+const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
+const button = document.getElementById('togglePush');
+const statusEl = document.getElementById('pushStatus');
 
-    function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-    }
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
-    async function registerServiceWorker() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.log("Push notifications are not supported");
+async function updateButtonState() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    button.textContent = "Push is not supported";
+    button.disabled = true;
+    return;
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+
+    if (sub) {
+      button.textContent = "Turn off notifications";
+      button.className = "bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg";
+      statusEl.textContent = "Test good";
+    } else {
+      button.textContent = "Turn on daily notifications";
+      button.className = "bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg";
+      statusEl.textContent = "";
+    }
+  } catch (err) {
+    button.textContent = "Error";
+    statusEl.textContent = "Error: " + err.message;
+  }
+}
+
+async function togglePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+
+    if (sub) {
+      await sub.unsubscribe();
+      await fetch('/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint })
+      });
+      statusEl.textContent = "Notifications are disabled";
+    } else {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        statusEl.textContent = "Permission denied";
         return;
-    }
+      }
 
-    try {
-        const reg = await navigator.serviceWorker.register("/static/service-worker.js");
-        console.log("SW registered:", reg);
-
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-        console.log("Permission not granted");
-        return;
-        }
-
-        const existingSub = await reg.pushManager.getSubscription();
-        if (existingSub) {
-            console.log("Already subscribed:", existingSub);
-            return;
-        }
-
-        const sub = await reg.pushManager.subscribe({
+      const newSub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        });
+      });
 
-        await fetch("/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sub.toJSON())
-        });
+      await fetch('/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSub.toJSON())
+      });
 
-        console.log("Successfully subscribed", sub);
-        alert("Push notifications are on!");
-    } catch (err) {
-        console.error("Subscription error:", err);
-    }
+      statusEl.textContent = "Notifications are enabled";
     }
 
-    registerServiceWorker();
+    updateButtonState();
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Error: " + err.message;
+  }
+}
+
+button.addEventListener('click', togglePush);
+updateButtonState();
 </script>
 
 </html>

@@ -321,6 +321,15 @@ def subscribe():
     
     return jsonify({"status": "subscripted"})
 
+@app.route('/unsubscribe', methods=['POST'])
+def unsubscribe():
+    data = request.get_json()
+    endpoint = data.get('endpoint')
+    if endpoint:
+        PushSubscription.query.filter_by(endpoint=endpoint).delete()
+        db.session.commit()
+    return jsonify({"status": "unsubscribed"})
+
 def send_push(title, body):
     subscriptions = PushSubscription.query.all()
     if not subscriptions:
