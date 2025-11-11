@@ -188,7 +188,7 @@ scheduler.add_job(
 scheduler.add_job(
     func=update_daily_stat,
     trigger="cron",
-    hour=0, minute=5,
+    hour=8, minute=5,
     id="daily_stat_job",
     replace_existing=True
 )
@@ -320,6 +320,8 @@ def subscribe():
     db.session.commit()
     
     return jsonify({"status": "subscripted"})
+
+
 
 def send_push(title, body):
     subscriptions = PushSubscription.query.all()

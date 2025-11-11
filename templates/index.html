@@ -44,6 +44,7 @@
 <button id="enablePush">Включить уведомления</button>
 
 <script>
+const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -70,7 +71,7 @@ document.getElementById("enablePush").addEventListener("click", async () => {
 
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array("{{ vapid_public_key | safe }}")
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
 
     await fetch("/subscribe", {
