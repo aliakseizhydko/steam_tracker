@@ -39,9 +39,18 @@
             <span>Dashboard</span>
         </a>
     </nav>
+    
+    <div id="pushNotificationPrompt" class="fixed bottom-28 right-6 z-40" 
+        style="bottom: calc(env(safe-area-inset-bottom, 0px) + 90px);">
+        <button id="enablePush" 
+                class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full hover:bg-cyan-500/40 transition-all">
+            <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+        </button>
+    </div>
 </body>
-
-<button id="enablePush">Включить уведомления</button>
 
 <script>
 const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
@@ -61,11 +70,11 @@ function urlBase64ToUint8Array(base64String) {
 document.getElementById("enablePush").addEventListener("click", async () => {
   try {
     const reg = await navigator.serviceWorker.register("/static/service-worker.js");
-    console.log("SW зарегистрирован:", reg);
+    console.log("SW registered:", reg);
 
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
-      alert("Разрешение не выдано");
+      alert("Permission denied");
       return;
     }
 
@@ -80,9 +89,9 @@ document.getElementById("enablePush").addEventListener("click", async () => {
       body: JSON.stringify(sub.toJSON())
     });
 
-    alert("✅ Уведомления включены!");
+    alert("Notifications are enabled!");
   } catch (err) {
-    console.error("Ошибка подписки:", err);
+    console.error("Error:", err);
   }
 });
 </script>

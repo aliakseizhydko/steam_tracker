@@ -9,8 +9,10 @@ from pywebpush import webpush, WebPushException
 app = Flask(__name__)
 
 load_dotenv()
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config.update(
+    SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+)
 
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 STEAM_ID = os.getenv("STEAM_ID")
@@ -131,24 +133,25 @@ def update_daily_stat():
         total_minutes = sum(v["end"] - v["start"] for v in stats_dict.values())
         total_hours = round(total_minutes / 60, 1)
         
-        if total_hours > 2:
-            phrases = [
-                f"Come on! {total_hours}h! Really? Go touch the grass today!",
-                f"{total_hours}h! You can't live yesterday again",
-                f"If you spent {total_hours} hours every day learning programming, you would have been on the Forbes list a long time ago."
-            ]
-        else:
-            phrases = [
-                f"{total_hours}h! I hope yesterday was a really great day!",
-                f"Just {total_hours}h. Life really is beautiful, isn't it?",
-                f"Well... {total_hours}h. This is truly a success."
-            ]
+        phrases = (
+                    [
+                        f"Come on! {total_hours}h! Really? Go touch the grass today!",
+                        f"{total_hours}h! You can't live yesterday again",
+                        f"If you spent {total_hours} hours every day learning programming, you would have been on the Forbes list a long time ago."
+                    ]
+                    if total_hours > 2 else
+                    [
+                        f"{total_hours}h! I hope yesterday was a really great day!",
+                        f"Just {total_hours}h. Life really is beautiful, isn't it?",
+                        f"Well... {total_hours}h. This is truly a success."
+                    ]
+                )
             
         message = random.choice(phrases)
         
         # Need check later
         if total_minutes > 0:
-            send_push("Push is here!", message)
+            send_push(message)
         
         stat = DailyStat(date=yesterday, total_minutes=int(total_minutes), message=message)
         db.session.merge(stat)
@@ -188,7 +191,7 @@ scheduler.add_job(
 scheduler.add_job(
     func=update_daily_stat,
     trigger="cron",
-    hour=8, minute=5,
+    hour=6, minute=40,
     id="daily_stat_job",
     replace_existing=True
 )
@@ -323,14 +326,13 @@ def subscribe():
 
 
 
-def send_push(title, body):
+def send_push(body):
     subscriptions = PushSubscription.query.all()
     if not subscriptions:
         print("No push subscriptions :(")
         return
     
     payload = json.dumps({
-        "title": title,
         "body": body,
         "icon": "/static/pics/icon0.png"
     })
