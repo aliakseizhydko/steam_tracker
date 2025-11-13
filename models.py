@@ -7,7 +7,7 @@ class PlayedGame(db.Model):
     __tablename__ = 'played_games'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
+    name = db.Column(db.String(100), unique=True)
     play_time_2weeks = db.Column(db.Integer)
     playtime_forever = db.Column(db.Integer)
     
@@ -46,7 +46,7 @@ class PushSubscription(db.Model):
     __tablename__ = 'push_subscriptions'
     
     id = db.Column(db.Integer, primary_key=True)
-    endpoint = db.Column(db.Text, nullable=False)
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
     p256dh = db.Column(db.Text, nullable=False)
     auth = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

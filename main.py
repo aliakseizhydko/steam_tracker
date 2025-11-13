@@ -68,8 +68,7 @@ def save_games_to_db(games_list):
             game.playtime_forever = playtime_forever
             updated += 1
     
-    # ???????
-    # db.session.commit()
+    db.session.commit()
     
     for g in games_list:
         name = g.get("name")
