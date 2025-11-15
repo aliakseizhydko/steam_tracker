@@ -1,10 +1,13 @@
-import requests, os, random, json
+import requests, os, random, json, time
 from flask import Flask, render_template, jsonify, request
 from models import db, PlayedGame, GameSnapshot, Friend, DailyStat, PushSubscription
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from pywebpush import webpush, WebPushException
+from collections import defaultdict
+from sqlalchemy import func, and_
+from functools import lru_cache
 
 app = Flask(__name__)
 
@@ -235,70 +238,79 @@ def update_friends_route():
     result = update_friends()
     return result
 
-@app.route('/dashboard')
-def dashboard():
-    # Statistics for the week
-    weeak_ago = datetime.utcnow() - timedelta(days=7)
-    snapshots = GameSnapshot.query.filter(GameSnapshot.create_at >= weeak_ago).all()
-    
-    stats_dict = {}
-    for snap in snapshots:
-        game = PlayedGame.query.get(snap.game_id)
-        
-        if not game:
-            continue
-        
-        name = game.name
-        
-        if name not in stats_dict:
-            stats_dict[name] = {"start": snap.playtime_forever, "end": snap.playtime_forever}
-        else:
-            stats_dict[name]["end"] = snap.playtime_forever
-            
-    stats_data = []
-    for name, times in stats_dict.items():
-        delta_minutes = times["end"] - times["start"]
-        delta_hours = round(delta_minutes / 60, 1)
-        if delta_hours > 0:
-            stats_data.append({"name": name, "hours": delta_hours})
-    stats_data.sort(key=lambda x: x["hours"], reverse=True)   
-    
-    # Comparison with friends
-    my_url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
-    my_params = {
+@lru_cache(maxsize=128)
+def _fetch_steam_playtime_cached(steamid, timestamp):
+    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
+    params = {
         "key": STEAM_API_KEY,
-        "steamid": STEAM_ID,
+        "steamid": steamid,
         "format": "json"
     }
-    my_r = requests.get(my_url, params=my_params)
-    my_games = my_r.json().get("response", {}).get("games", [])
-    my_total = sum(g.get("playtime_2weeks", 0) for g in my_games) / 60
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        games = r.json().get("response", {}).get("games", [])
+        return sum(g.get("playtime_2weeks", 0) for g in games) / 60
+    except:
+        return 0.0
+
+def get_steam_playtime(steamid):
+    # Округляем время до 10 минут — чтобы кэш работал
+    cache_key_time = int(time.time() // 600) * 600
+    return _fetch_steam_playtime_cached(steamid, cache_key_time)
+
+@app.route('/dashboard')
+def dashboard():
+    week_ago = datetime.utcnow() - timedelta(days=7)
     
-    friends = Friend.query.all()
+    snapshots = (
+            db.session.query(
+                GameSnapshot.game_id,
+                func.min(GameSnapshot.playtime_forever).label('min_pt'),
+                func.max(GameSnapshot.playtime_forever).label('max_pt'),
+                PlayedGame.name
+            )
+            .join(PlayedGame, GameSnapshot.game_id == PlayedGame.id)
+            .filter(GameSnapshot.create_at >= week_ago)
+            .group_by(GameSnapshot.game_id, PlayedGame.name)
+            .all()
+        )
+
+    stats_data = []
+    for _, min_pt, max_pt, name in snapshots:
+            hours = round((max_pt - min_pt) / 60, 1)
+            if hours >= 0.1:
+                stats_data.append({"name": name, "hours": hours})
+    
+    stats_data.sort(key=lambda x: x["hours"], reverse=True)
+
+    labels = [row["name"] for row in stats_data]
+    values = [row["hours"] for row in stats_data]
+
+    my_total = get_steam_playtime(STEAM_ID)
+    friends = Friend.query.with_entities(Friend.steamid, Friend.personaname, Friend.avatar).all()
+
     comparisons = []
     for friend in friends:
-        url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
-        params = {
-            "key": STEAM_API_KEY,
-            "steamid": friend.steamid,
-            "format": "json"
-        }
-        r = requests.get(url, params=params)
-        data = r.json().get("response", {}).get("games", [])
-        total = sum(g.get("playtime_2weeks", 0) for g in data) / 60
-        diff = round(my_total - total, 1)
+        friend_hours = get_steam_playtime(friend.steamid)
+        diff = round(my_total - friend_hours, 1)
         comparisons.append({
             "name": friend.personaname,
             "avatar": friend.avatar,
-            "friend_hours": round(total, 1),
+            "friend_hours": round(friend_hours, 1),
             "diff": diff
         })
+    
     comparisons.sort(key=lambda x: x["friend_hours"], reverse=True)
-    
-    labels = [row["name"] for row in stats_data]
-    values = [row["hours"] for row in stats_data]
-    
-    return render_template("dashboard.html", stats=stats_data, labels=labels, values=values, me=my_total, comparisons=comparisons)
+
+    return render_template(
+        "dashboard.html",
+        stats=stats_data,
+        labels=labels,
+        values=values,
+        me=round(my_total, 1),
+        comparisons=comparisons
+    )
 
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
