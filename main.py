@@ -48,12 +48,14 @@ def save_games_to_db(games_list):
     
     for game in old_games:
         name = game.name
-        GameSnapshot.query.filter_by(game_id=game.id).delete()
+        GameSnapshot.query.filter_by(game_id=game.id).delete(synchronize_session='fetch')
         db.session.delete(game)
         deleted += 1
         
         message = random.choice(phrases_for_deleted).format(name)
         send_push(message)
+    
+    snapshots_to_add = []
     
     for g in games_list:
         name = g.get("name")
@@ -78,17 +80,33 @@ def save_games_to_db(games_list):
             game.playtime_forever = playtime_forever
             updated += 1
     
-    db.session.commit()
+        db.session.flush()
     
-    for g in games_list:
-        name = g.get("name")
-        game = PlayedGame.query.filter_by(name=name).first()
-        if game:
-            snapshot = GameSnapshot(
-                game_id=game.id,
-                playtime_forever=game.playtime_forever
-            )
-            db.session.add(snapshot)
+    # for g in games_list:
+        # name = g.get("name")
+        # game = PlayedGame.query.filter_by(name=name).first()
+        
+        # if not game:
+        #     continue
+        
+        last_snapshot = (
+            GameSnapshot.query
+            .filter_by(game_id=game.id)
+            .order_by(GameSnapshot.create_at.desc())
+            .first()
+        )
+        
+        if not last_snapshot or last_snapshot.playtime_forever != game.playtime_forever:
+            continue
+        # if game:
+        snapshot = GameSnapshot(
+            game_id=game.id,
+            playtime_forever=game.playtime_forever
+        )
+        snapshots_to_add.append(snapshot)
+     
+    if snapshots_to_add:
+        db.session.bulk_save_objects(snapshots_to_add)
             
     db.session.commit()
     return {"saved": saved, "updated": updated, "deleted": deleted}

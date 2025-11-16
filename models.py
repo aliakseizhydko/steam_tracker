@@ -20,9 +20,9 @@ class GameSnapshot(db.Model):
     __tablename__ = 'game_snapshots'
     
     id = db.Column(db.Integer, primary_key=True)
-    game_id = db.Column(db.Integer, db.ForeignKey('played_games.id', ondelete="RESTRICT"), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('played_games.id', ondelete="RESTRICT"), nullable=False, index=True)
     playtime_forever = db.Column(db.Integer, default=0)
-    create_at = db.Column(db.DateTime, default=datetime.utcnow)
+    create_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 class Friend(db.Model):
     __tablename__ = 'friends'
