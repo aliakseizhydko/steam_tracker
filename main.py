@@ -295,7 +295,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(
     func=scheduled_update,
     trigger="interval",
-    minutes=60,
+    minutes=45,
     id="steam_update",
     replace_existing=True
 )
