@@ -6,7 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from pywebpush import webpush, WebPushException
 from collections import defaultdict
-from sqlalchemy import func, and_, text
+from sqlalchemy import func, and_, text, create_engine
 from functools import lru_cache
 
 app = Flask(__name__)
@@ -29,21 +29,22 @@ def init_db_command():
         
 @app.cli.command("add-perf-indexes")
 def add_indexes_command():
-    with app.app_context():
-        with db.engine.connect() as connection:
-            print("Checking and adding index to game_id...")
-            try:
-                connection.execute(text("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_game_id ON game_snapshots(game_id)"))
-                print("Index idx_game_id was added successfully or already exists.")
-            except Exception as e:
-                print(f"Error adding idx_game_id: {e}")
-            print("Checking and adding index on created_at...")
-            try:
-                connection.execute(text("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_create_at ON game_snapshots(create_at)"))
-                print("Index idx_create_at was added successfully or already exists.")
-            except Exception as e:
-                print(f"Error adding idx_create_at: {e}")
-        print('OK')
+    db_url = db.engine.url
+    engine = create_engine(db_url, isolation_level="AUTOCOMMIT")
+    with engine.connect() as connection:
+        print("Checking and adding index to game_id...")
+        try:
+            connection.execute(text("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_game_id ON game_snapshots(game_id)"))
+            print("Index idx_game_id was added successfully or already exists.")
+        except Exception as e:
+            print(f"Error adding idx_game_id: {e}")
+        print("Checking and adding index on created_at...")
+        try:
+            connection.execute(text("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_create_at ON game_snapshots(create_at)"))
+            print("Index idx_create_at was added successfully or already exists.")
+        except Exception as e:
+            print(f"Error adding idx_create_at: {e}")
+    print('OK')
             
 
 def save_games_to_db(games_list):
