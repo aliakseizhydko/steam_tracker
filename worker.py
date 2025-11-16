@@ -3,7 +3,7 @@ import time
 
 if __name__ == "__main__":
     with app.app_context():
-        print("Starting worker + scgeduler...")
+        print("Starting worker + scheduler...")
         scheduler.start()
         try:
             while True:

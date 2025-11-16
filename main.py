@@ -27,30 +27,33 @@ def init_db_command():
     with app.app_context():
         db.create_all()   
 
-@app.route('/')
-def home():
-    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
-    params = {
-        "key": STEAM_API_KEY,
-        "steamid": STEAM_ID,
-        "format": "json"
-    }
-    response = requests.get(url, params=params)
-    games = response.json().get("response", {}).get("games", [])
-    return render_template("index.html", games=games, vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
-
 def save_games_to_db(games_list):
-    saved = 0
-    updated = 0
-    deleted = 0
+    saved, updated, deleted = 0, 0, 0
     
     current_games = [g.get("name") for g in games_list if g.get("name")]
     old_games = PlayedGame.query.filter(~PlayedGame.name.in_(current_games)).all()
     
+    phrases_for_deleted = [
+        "**{}** has dropped out of the recent",
+        "**{}** did not start for more than two weeks",
+        "Goodbye, **{}**"
+    ]
+    
+    phrases_for_saved = [
+        "You started playing **{}**",
+        "What are your first impressions of **{}**",
+        "Welcome aboard, **{}**",
+        "**{}** added to statistics"
+    ]
+    
     for game in old_games:
+        name = game.name
         GameSnapshot.query.filter_by(game_id=game.id).delete()
         db.session.delete(game)
         deleted += 1
+        
+        message = random.choice(phrases_for_deleted).format(name)
+        send_push(message)
     
     for g in games_list:
         name = g.get("name")
@@ -58,14 +61,18 @@ def save_games_to_db(games_list):
         playtime_forever = g.get("playtime_forever", 0)
         
         game = PlayedGame.query.filter_by(name=name).first()
+        
         if game is None:
-            new_game = PlayedGame(
+            game = PlayedGame(
                 name=name,
                 play_time_2weeks=playtime_2weeks,
                 playtime_forever=playtime_forever
             )
-            db.session.add(new_game)
+            db.session.add(game)
             saved += 1
+            
+            message = random.choice(phrases_for_saved).format(name)
+            send_push(message)
         else:
             game.play_time_2weeks = playtime_2weeks
             game.playtime_forever = playtime_forever
@@ -86,26 +93,6 @@ def save_games_to_db(games_list):
     db.session.commit()
     return {"saved": saved, "updated": updated, "deleted": deleted}
 
-@app.route('/save_recent')
-def save_recent():
-    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
-    params = {
-        "key": STEAM_API_KEY,
-        "steamid": STEAM_ID,
-        "format": "json"
-    }
-    r = requests.get(url, params=params)  
-    data = r.json().get("response", {})
-    games = data.get("games", []) 
-    
-    result = save_games_to_db(games)
-    return jsonify(result)
-
-@app.route('/games')
-def show_games():
-    games = PlayedGame.query.order_by(PlayedGame.id.desc()).all()
-    return render_template("games.html", games=games)
-
 def update_daily_stat():
     with app.app_context():
         today = datetime.utcnow().date()
@@ -118,7 +105,7 @@ def update_daily_stat():
                                             GameSnapshot.create_at < end).all()
         
         if not snapshots:
-            print('DAAAAAAMN! Really? Did you live a fully real life yesterday?')
+            print(f"No snapshots from {start} to {end}")
             return
         
         stats_dict = {}
@@ -151,9 +138,10 @@ def update_daily_stat():
             
         message = random.choice(phrases)
         
-        # Need check later
         if total_minutes > 0:
             send_push(message)
+        else:
+            send_push(f"{total_hours}? This is a miracle or a bug that needs to be fixed.")
         
         stat = DailyStat(date=yesterday, total_minutes=int(total_minutes), message=message)
         db.session.merge(stat)
@@ -180,24 +168,6 @@ def scheduled_update():
             db.session.rollback()
             print(f"That was fuck up: {e}")
             
-scheduler = BackgroundScheduler()
-
-scheduler.add_job(
-    func=scheduled_update,
-    trigger="interval",
-    minutes=60,
-    id="steam_update",
-    replace_existing=True
-)
-
-scheduler.add_job(
-    func=update_daily_stat,
-    trigger="cron",
-    hour=6, minute=40,
-    id="daily_stat_job",
-    replace_existing=True
-)
-
 def update_friends():
     url = "http://api.steampowered.com/ISteamUser/GetFriendList/v0001/"
     params = {
@@ -233,6 +203,91 @@ def update_friends():
     db.session.commit()
     return f"Updated {count} friends"
 
+def get_steam_playtime(steamid):
+    cache_key_time = int(time.time() // 600) * 600
+    return _fetch_steam_playtime_cached(steamid, cache_key_time)
+
+def send_push(body):
+    subscriptions = PushSubscription.query.all()
+    if not subscriptions:
+        print("No push subscriptions :(")
+        return
+    
+    payload = json.dumps({
+        "body": body,
+        "icon": "/static/pics/icon0.png"
+    })
+    
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {
+                        "p256dh": sub.p256dh,
+                        "auth": sub.auth
+                    }
+                },
+                data=payload,
+                vapid_private_key=os.getenv("VAPID_PRIVATE_KEY"),
+                vapid_claims={
+                    "sub": f"mailto:{os.getenv('VAPID_ADMIN_EMAIL')}"
+                }
+            )
+            print(f"Push sent to {sub.endpoint[:60]}...")
+        except WebPushException as e:
+            print(f"Push failed: {e}")
+
+@app.route('/')
+def home():
+    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
+    params = {
+        "key": STEAM_API_KEY,
+        "steamid": STEAM_ID,
+        "format": "json"
+    }
+    response = requests.get(url, params=params)
+    games = response.json().get("response", {}).get("games", [])
+    return render_template("index.html", games=games, vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
+
+@app.route('/save_recent')
+def save_recent():
+    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
+    params = {
+        "key": STEAM_API_KEY,
+        "steamid": STEAM_ID,
+        "format": "json"
+    }
+    r = requests.get(url, params=params)  
+    data = r.json().get("response", {})
+    games = data.get("games", []) 
+    
+    result = save_games_to_db(games)
+    return jsonify(result)
+
+@app.route('/games')
+def show_games():
+    games = PlayedGame.query.order_by(PlayedGame.id.desc()).all()
+    return render_template("games.html", games=games)
+            
+scheduler = BackgroundScheduler()
+
+scheduler.add_job(
+    func=scheduled_update,
+    trigger="interval",
+    minutes=60,
+    id="steam_update",
+    replace_existing=True
+)
+
+scheduler.add_job(
+    func=update_daily_stat,
+    trigger="cron",
+    hour=6, minute=40,
+    id="daily_stat_job",
+    replace_existing=True
+)
+
 @app.route('/update_friends')
 def update_friends_route():
     result = update_friends()
@@ -253,11 +308,6 @@ def _fetch_steam_playtime_cached(steamid, timestamp):
         return sum(g.get("playtime_2weeks", 0) for g in games) / 60
     except:
         return 0.0
-
-def get_steam_playtime(steamid):
-    # Округляем время до 10 минут — чтобы кэш работал
-    cache_key_time = int(time.time() // 600) * 600
-    return _fetch_steam_playtime_cached(steamid, cache_key_time)
 
 @app.route('/dashboard')
 def dashboard():
@@ -334,39 +384,6 @@ def subscribe():
     db.session.commit()
     
     return jsonify({"status": "subscripted"})
-
-
-
-def send_push(body):
-    subscriptions = PushSubscription.query.all()
-    if not subscriptions:
-        print("No push subscriptions :(")
-        return
-    
-    payload = json.dumps({
-        "body": body,
-        "icon": "/static/pics/icon0.png"
-    })
-    
-    for sub in subscriptions:
-        try:
-            webpush(
-                subscription_info={
-                    "endpoint": sub.endpoint,
-                    "keys": {
-                        "p256dh": sub.p256dh,
-                        "auth": sub.auth
-                    }
-                },
-                data=payload,
-                vapid_private_key=os.getenv("VAPID_PRIVATE_KEY"),
-                vapid_claims={
-                    "sub": f"mailto:{os.getenv('VAPID_ADMIN_EMAIL')}"
-                }
-            )
-            print(f"Push sent to {sub.endpoint[:60]}...")
-        except WebPushException as e:
-            print(f"Push failed: {e}")
             
 if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
     scheduler.start()
@@ -379,4 +396,5 @@ if __name__ == "__main__":
             port=int(os.getenv("PORT", 5000)),
             debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
             threaded=True,
-            use_reloader=False)
+            use_reloader=False
+            )
