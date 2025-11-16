@@ -56,9 +56,14 @@ def save_games_to_db(games_list):
         send_push(message)
     
     snapshots_to_add = []
+    game_map = {}
     
     for g in games_list:
         name = g.get("name")
+        
+        if not name:
+            continue
+        
         playtime_2weeks = g.get("playtime_2weeks", 0)
         playtime_forever = g.get("playtime_forever", 0)
         
@@ -79,15 +84,14 @@ def save_games_to_db(games_list):
             game.play_time_2weeks = playtime_2weeks
             game.playtime_forever = playtime_forever
             updated += 1
-    
-        db.session.flush()
-    
-    # for g in games_list:
-        # name = g.get("name")
-        # game = PlayedGame.query.filter_by(name=name).first()
         
-        # if not game:
-        #     continue
+        game_map[name] = game
+    
+    db.session.flush()
+
+    for name, game in game_map.items():
+        if not game.id:
+            continue
         
         last_snapshot = (
             GameSnapshot.query
@@ -102,7 +106,7 @@ def save_games_to_db(games_list):
                 playtime_forever=game.playtime_forever
             )
             snapshots_to_add.append(snapshot)
-     
+            
     if snapshots_to_add:
         db.session.bulk_save_objects(snapshots_to_add)
             
