@@ -97,13 +97,11 @@ def save_games_to_db(games_list):
         )
         
         if not last_snapshot or last_snapshot.playtime_forever != game.playtime_forever:
-            continue
-        # if game:
-        snapshot = GameSnapshot(
-            game_id=game.id,
-            playtime_forever=game.playtime_forever
-        )
-        snapshots_to_add.append(snapshot)
+            snapshot = GameSnapshot(
+                game_id=game.id,
+                playtime_forever=game.playtime_forever
+            )
+            snapshots_to_add.append(snapshot)
      
     if snapshots_to_add:
         db.session.bulk_save_objects(snapshots_to_add)
