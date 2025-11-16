@@ -40,60 +40,110 @@
         </a>
     </nav>
     
-    <div id="pushNotificationPrompt" class="fixed bottom-28 right-6 z-40" 
-        style="bottom: calc(env(safe-area-inset-bottom, 0px) + 90px);">
-        <button id="enablePush" 
-                class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full hover:bg-cyan-500/40 transition-all">
-            <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-            </svg>
-        </button>
-    </div>
+<div id="pushNotificationPrompt" class="fixed top-4 right-4 z-50">
+    <button id="enablePush" 
+            class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full 
+                   hover:bg-cyan-500/40 transition-all duration-300 
+                   shadow-lg hover:shadow-cyan-500/50">
+        <svg id="bellIcon" class="w-6 h-6 text-cyan-400" 
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path id="bellOutline" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+    </button>
+</div>
 </body>
 
 <script>
-const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+  const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
+  const bellIcon = document.getElementById('bellIcon');
+  const bellOutline = document.getElementById('bellOutline');
+  let isSubscribed = false;
 
-document.getElementById("enablePush").addEventListener("click", async () => {
-  try {
-    const reg = await navigator.serviceWorker.register("/static/service-worker.js");
-    console.log("SW registered:", reg);
-
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      alert("Permission denied");
-      return;
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
     }
+    return outputArray;
 
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
+  async function updateBellState() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          return;
+      }
 
-    await fetch("/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sub.toJSON())
-    });
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
 
-    alert("Notifications are enabled!");
-  } catch (err) {
-    console.error("Error:", err);
+      isSubscribed = !!sub;
+
+      if (isSubscribed) {
+          bellIcon.innerHTML = `
+              <path fill="currentColor" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9z"/>
+              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 18.5L18 17h-3m-3-1v1a3 3 0 006 0v-1m-6 0h6"/>
+          `;
+      } else {
+          bellIcon.innerHTML = `
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          `;
+      }
   }
-});
+
+  document.getElementById("enablePush").addEventListener("click", async () => {
+      try {
+          const reg = await navigator.serviceWorker.ready;
+
+          if (isSubscribed) {
+              const sub = await reg.pushManager.getSubscription();
+              if (sub) {
+                  await sub.unsubscribe();
+                  await fetch("/unsubscribe", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ endpoint: sub.endpoint })
+                  });
+              }
+              alert("Notifications disabled");
+          } else {
+              const permission = await Notification.requestPermission();
+              if (permission !== "granted") {
+                  alert("Permission denied");
+                  return;
+              }
+
+              const sub = await reg.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+              });
+
+              await fetch("/subscribe", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(sub.toJSON())
+              });
+
+              alert("Notifications enabled!");
+          }
+
+          await updateBellState();
+
+      } catch (err) {
+          console.error("Push error:", err);
+          alert("Error: " + err.message);
+      }
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+      navigator.serviceWorker.register('/static/service-worker.js')
+          .then(() => updateBellState())
+          .catch(err => console.error('SW registration failed:', err));
+  });
 </script>
 
 

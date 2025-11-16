@@ -402,6 +402,18 @@ def subscribe():
     db.session.commit()
     
     return jsonify({"status": "subscripted"})
+
+@app.route('/unsubscribe', methods=['POST'])
+def unsubscribe():
+    data = request.get_json()
+    endpoint = data.get('endpoint')
+    if not endpoint:
+        return jsonify({"error": "No endpoint"}), 400
+    
+    deleted = PushSubscription.query.filter_by(endpoint=endpoint).delete()
+    db.session.commit()
+    
+    return jsonify({"status": "unsubscribed", "deleted": deleted})
             
 if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
     scheduler.start()
