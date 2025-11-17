@@ -6,7 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from pywebpush import webpush, WebPushException
 from collections import defaultdict
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, asc
 from functools import lru_cache
 
 app = Flask(__name__)
@@ -99,7 +99,9 @@ def save_games_to_db(games_list):
             .order_by(GameSnapshot.create_at.desc())
             .first()
         )
-        
+        # There is a debug
+        # print(f"{name} == {game}")
+        # print(last_snapshot)
         if not last_snapshot or last_snapshot.playtime_forever != game.playtime_forever:
             snapshot = GameSnapshot(
                 game_id=game.id,
@@ -109,6 +111,12 @@ def save_games_to_db(games_list):
             
     if snapshots_to_add:
         db.session.bulk_save_objects(snapshots_to_add)
+    
+    # Remove old snapshots    
+    non_actual_snapshots = datetime.utcnow() - timedelta(days=8)
+    deleted_count = GameSnapshot.query.filter(
+        GameSnapshot.create_at < non_actual_snapshots
+    ).delete(synchronize_session='fetch')
             
     db.session.commit()
     return {"saved": saved, "updated": updated, "deleted": deleted}
@@ -121,8 +129,10 @@ def update_daily_stat():
         start = datetime.combine(yesterday, datetime.min.time())
         end = datetime.combine(today, datetime.min.time())
         
-        snapshots = GameSnapshot.query.filter(GameSnapshot.create_at >= start,
-                                            GameSnapshot.create_at < end).all()
+        snapshots = GameSnapshot.query.filter(
+                GameSnapshot.create_at >= start,
+                GameSnapshot.create_at < end
+            ).order_by(asc(GameSnapshot.create_at)).all()
         
         if not snapshots:
             print(f"No snapshots from {start} to {end}")
@@ -345,13 +355,14 @@ def dashboard():
             .group_by(GameSnapshot.game_id, PlayedGame.name)
             .all()
         )
+    
 
     stats_data = []
     for _, min_pt, max_pt, name in snapshots:
-            hours = round((max_pt - min_pt) / 60, 1)
-            if hours >= 0.1:
-                stats_data.append({"name": name, "hours": hours})
-    
+        hours = round((max_pt - min_pt) / 60, 1)
+        if hours >= 0.1:
+            stats_data.append({"name": name, "hours": hours})
+
     stats_data.sort(key=lambda x: x["hours"], reverse=True)
 
     labels = [row["name"] for row in stats_data]
