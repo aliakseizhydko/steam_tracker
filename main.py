@@ -19,6 +19,10 @@ app.config.update(
 
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 STEAM_ID = os.getenv("STEAM_ID")
+STEAM_BASE = "http://api.steampowered.com/"
+STEAM_RECENTLY_PLAYED_GAMES = f"{STEAM_BASE}IPlayerService/GetRecentlyPlayedGames/v0001/"
+STEAM_FRIEND_LIST = f"{STEAM_BASE}ISteamUser/GetFriendList/v0001/"
+STEAM_PLAYER_SUMMARIES = f"{STEAM_BASE}ISteamUser/GetPlayerSummaries/v0002/"
 
 db.init_app(app)
 
@@ -34,16 +38,15 @@ def save_games_to_db(games_list):
     old_games = PlayedGame.query.filter(~PlayedGame.name.in_(current_games)).all()
     
     phrases_for_deleted = [
-        "**{}** has dropped out of the recent",
-        "**{}** did not start for more than two weeks",
-        "Goodbye, **{}**"
+        "\"{}\" has dropped out of the recent",
+        "\"{}\" did not start for more than two weeks",
+        "Goodbye, \"{}\""
     ]
     
     phrases_for_saved = [
-        "You started playing **{}**",
-        "What are your first impressions of **{}**",
-        "Welcome aboard, **{}**",
-        "**{}** added to statistics"
+        "You started playing \"{}\"",
+        "Welcome aboard, \"{}\"",
+        "\"{}\" added to statistics"
     ]
     
     for game in old_games:
@@ -171,7 +174,7 @@ def update_daily_stat():
         if total_minutes > 0:
             send_push(message)
         else:
-            send_push(f"{total_hours}? This is a miracle or a bug that needs to be fixed.")
+            send_push("0h! Need to fix a bug.")
         
         stat = DailyStat(date=yesterday, total_minutes=int(total_minutes), message=message)
         db.session.merge(stat)
@@ -182,13 +185,12 @@ def scheduled_update():
     with app.app_context():
         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting automatic updates...")
         try:
-            url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
             params = {
                 "key": STEAM_API_KEY,
                 "steamid": STEAM_ID,
                 "format": "json"
             }
-            r = requests.get(url, params=params)  
+            r = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params)  
             data = r.json().get("response", {})
             games = data.get("games", [])
             
@@ -199,21 +201,19 @@ def scheduled_update():
             print(f"That was fuck up: {e}")
             
 def update_friends():
-    url = "http://api.steampowered.com/ISteamUser/GetFriendList/v0001/"
     params = {
         "key": STEAM_API_KEY,
         "steamid": STEAM_ID,
         "relationship": "friend"
     }
-    r = requests.get(url, params=params)
+    r = requests.get(STEAM_FRIEND_LIST, params=params)
     friends_data = r.json().get("friendslist", {}).get("friends", [])
     
     count = 0
     for f in friends_data:
         friend_id = f["steamid"]
-        info_url = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/"
         info_params = {"key": STEAM_API_KEY, "steamids": friend_id}
-        info_r = requests.get(info_url, params=info_params)
+        info_r = requests.get(STEAM_PLAYER_SUMMARIES, params=info_params)
         player = info_r.json().get("response", {}).get("players", [])
         
         if not player:
@@ -270,25 +270,23 @@ def send_push(body):
 
 @app.route('/')
 def home():
-    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
     params = {
         "key": STEAM_API_KEY,
         "steamid": STEAM_ID,
         "format": "json"
     }
-    response = requests.get(url, params=params)
+    response = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params)
     games = response.json().get("response", {}).get("games", [])
     return render_template("index.html", games=games, vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
 
 @app.route('/save_recent')
 def save_recent():
-    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
     params = {
         "key": STEAM_API_KEY,
         "steamid": STEAM_ID,
         "format": "json"
     }
-    r = requests.get(url, params=params)  
+    r = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params)  
     data = r.json().get("response", {})
     games = data.get("games", []) 
     
@@ -325,14 +323,13 @@ def update_friends_route():
 
 @lru_cache(maxsize=128)
 def _fetch_steam_playtime_cached(steamid, timestamp):
-    url = "http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
     params = {
         "key": STEAM_API_KEY,
         "steamid": steamid,
         "format": "json"
     }
     try:
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params, timeout=10)
         r.raise_for_status()
         games = r.json().get("response", {}).get("games", [])
         return sum(g.get("playtime_2weeks", 0) for g in games) / 60
