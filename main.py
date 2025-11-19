@@ -139,7 +139,7 @@ def update_daily_stat():
         
         if not snapshots:
             print(f"No snapshots from {start} to {end}")
-            return
+            send_push("Are you alive? 🙂‍")
         
         stats_dict = {}
         for snap in snapshots:
