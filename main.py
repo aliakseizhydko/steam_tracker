@@ -1,4 +1,4 @@
-import requests, os, random, json, time
+import requests, os, random, json, time, logging
 from flask import Flask, render_template, jsonify, request
 from models import db, PlayedGame, GameSnapshot, Friend, DailyStat, PushSubscription
 from dotenv import load_dotenv
@@ -10,6 +10,15 @@ from sqlalchemy import func, and_, asc
 from functools import lru_cache
 
 app = Flask(__name__)
+
+# maybe move to utils/logging_setup.py later
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 app.config.update(
@@ -102,9 +111,7 @@ def save_games_to_db(games_list):
             .order_by(GameSnapshot.create_at.desc())
             .first()
         )
-        # There is a debug
-        # print(f"{name} == {game}")
-        # print(last_snapshot)
+
         if not last_snapshot or last_snapshot.playtime_forever != game.playtime_forever:
             snapshot = GameSnapshot(
                 game_id=game.id,
@@ -120,12 +127,15 @@ def save_games_to_db(games_list):
     deleted_count = GameSnapshot.query.filter(
         GameSnapshot.create_at < non_actual_snapshots
     ).delete(synchronize_session='fetch')
+    logger.info(f"Removed {deleted_count} old snapshots")
             
     db.session.commit()
     return {"saved": saved, "updated": updated, "deleted": deleted}
 
 def update_daily_stat():
     with app.app_context():
+        logger.info("Starting daily statistics update.")
+        
         today = datetime.utcnow().date()
         yesterday = today - timedelta(days=1)
         
@@ -138,13 +148,15 @@ def update_daily_stat():
             ).order_by(asc(GameSnapshot.create_at)).all()
         
         if not snapshots:
-            print(f"No snapshots from {start} to {end}")
+            logger.info(f"No snapshots from {start} to {end}")
             send_push("Are you alive? 🙂‍")
+            return
         
         stats_dict = {}
         for snap in snapshots:
             game = PlayedGame.query.get(snap.game_id)
             if not game:
+                logger.debug(f"Skipping snapshot {snap.id}, game {snap.game_id} not found in PlayedGame.")
                 continue
             name = game.name
             if name not in stats_dict:
@@ -159,13 +171,17 @@ def update_daily_stat():
                     [
                         f"Come on! {total_hours}h! Really? Go touch the grass today!",
                         f"{total_hours}h! You can't live yesterday again",
-                        f"If you spent {total_hours} hours every day learning programming, you would have been on the Forbes list a long time ago."
+                        f"If you spent {total_hours} hours every day learning programming, you would have been on the Forbes list a long time ago.",
+                        f"You played for {total_hours} hours yesterday. 🥴",
+                        f"{total_hours} hours! 🖕"
                     ]
                     if total_hours > 2 else
                     [
                         f"{total_hours}h! I hope yesterday was a really great day!",
                         f"Just {total_hours}h. Life really is beautiful, isn't it?",
-                        f"Well... {total_hours}h. This is truly a success."
+                        f"Well... {total_hours}h. This is truly a success.",
+                        f"You played for {total_hours} hours yesterday. 😎",
+                        f"{total_hours} hours! 🤘"
                     ]
                 )
             
@@ -175,15 +191,18 @@ def update_daily_stat():
             send_push(message)
         else:
             send_push("0h! Need to fix a bug.")
+            logger.info("Total playtime was 0 hours.")
+            logger.debug(f"Debug stats dictionary for {yesterday}: {stats_dict}")
         
         stat = DailyStat(date=yesterday, total_minutes=int(total_minutes), message=message)
         db.session.merge(stat)
         db.session.commit()
-        print(message)   
+        
+        logger.info(f"Daily stat updated for {yesterday}. Total hours: {total_hours}")  
 
 def scheduled_update():
     with app.app_context():
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting automatic updates...")
+        logger.info("Starting automatic updates...")
         try:
             params = {
                 "key": STEAM_API_KEY,
@@ -195,10 +214,10 @@ def scheduled_update():
             games = data.get("games", [])
             
             result = save_games_to_db(games)
-            print(f"Updated: {result}")
+            logger.info(f"Updated: {result}")
         except Exception as e:
             db.session.rollback()
-            print(f"That was fuck up: {e}")
+            logger.error(f"An error occurred during scheduled update: {e}", exc_info=True)
             
 def update_friends():
     params = {
@@ -240,7 +259,7 @@ def get_steam_playtime(steamid):
 def send_push(body):
     subscriptions = PushSubscription.query.all()
     if not subscriptions:
-        print("No push subscriptions :(")
+        logger.info("No active push subscriptions found.")
         return
     
     payload = json.dumps({
@@ -264,9 +283,9 @@ def send_push(body):
                     "sub": f"mailto:{os.getenv('VAPID_ADMIN_EMAIL')}"
                 }
             )
-            print(f"Push sent to {sub.endpoint[:60]}...")
+            logger.debug(f"Push successfully sent to endpoint: {sub.endpoint[:60]}.")
         except WebPushException as e:
-            print(f"Push failed: {e}")
+            logger.warning(f"Push notification failed for endpoint {sub.endpoint[:60]}.")
 
 @app.route('/')
 def home():
@@ -303,7 +322,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(
     func=scheduled_update,
     trigger="interval",
-    minutes=45,
+    minutes=25,
     id="steam_update",
     replace_existing=True
 )
@@ -427,7 +446,7 @@ def unsubscribe():
             
 if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
     scheduler.start()
-    print("Scheduler enabled")
+    logger.info("Background scheduler enabled and started.")
 
 if __name__ == "__main__":
         
