@@ -9,22 +9,54 @@
     <meta name="apple-mobile-web-app-title" content="Steam Tracker">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='pics/icon0.png') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <title>Steam Tracker</title>
+    <style>
+        body { background:#0b0c10; color:#66fcf1; font-family:sans-serif; margin:0; padding:0; padding-bottom:100px; }
+        h1 { text-align:center; padding:30px 0 10px; font-size:2.5rem; }
+        p { text-align:center; margin-bottom:30px; opacity:0.9; }
+        .container { width:90%; max-width:1000px; margin:0 auto; }
+        .section { background:#0f111a; border-radius:12px; padding:25px; margin-top:20px; box-shadow:0 6px 18px rgba(0,0,0,0.6); }
+        .chart-container { height: 360px; position: relative; margin: 20px 0; }
+        .no-data { text-align:center; font-size:1.2rem; opacity:0.7; margin-top:50px; }
+    </style>
 </head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold mb-4">Steam Statistics</h1>
+        <p>Games played in the last 2 weeks</p>
 
-<body style="background-color:#0b0c10; color:#66fcf1; font-family:sans-serif; text-align:center;">
-    <h1 class="text-3xl font-bold mb-4">Steam Statistics</h1>
-    <p class="mb-4">Here you can see what games have been played over the last two weeks</p>
-    <ul style="list-style-type: none; padding: 0; margin: 0;">
-        {% for game in games %}
-            <li>{{ game.name }} - {{ (game.playtime_2weeks / 60)|round(1)}} h</li>
-        {% endfor %}
-    </ul>
+        <div class="section">
+            <div class="chart-container">
+                <canvas id="twoWeeksChart"></canvas>
+            </div>
+
+            {% if games|length == 0 %}
+                <div class="no-data">No games played in the last 2 weeks<br>MAKE STEAM GREAT AGAIN</div>
+            {% else %}
+                <table style="width:100%; margin-top:20px; border-collapse:collapse; color:#e6f7ff;">
+                    <thead>
+                        <tr style="border-bottom:2px solid #122;">
+                            <th style="text-align:left; padding:10px;">Game</th>
+                            <th style="text-align:right; padding:10px;">Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for game in games %}
+                            <tr style="border-bottom:1px solid #122;">
+                                <td style="padding:10px;">{{ game.name }}</td>
+                                <td style="text-align:right; padding:10px;">{{ (game.playtime_2weeks / 60)|round(1) }} h</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
 
     <nav class="fixed left-0 right-0 bg-gray-900 text-white border-t border-gray-700 flex justify-around py-3"
-     style="bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);">
-
+         style="bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);">
         <a href="/games" class="flex flex-col items-center text-sm hover:text-green-400">
             <span>More Info</span>
         </a>
@@ -32,120 +64,139 @@
             <span>Dashboard</span>
         </a>
     </nav>
-    
-<div id="pushNotificationPrompt" class="fixed bottom-28 right-6 z-40">
-    <button id="togglePush" 
-            class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full 
-                   hover:bg-cyan-500/40 transition-all duration-300 
-                   shadow-lg hover:shadow-cyan-500/50">
-        <svg id="bellIcon" class="w-6 h-6 text-cyan-400 transition-all" 
-             fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path id="bellPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-        </svg>
-    </button>
-</div>
-</body>
 
-<script>
-  const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
-  const toggleBtn = document.getElementById('togglePush');
-  const bellIcon = document.getElementById('bellIcon');
-  const bellPath = document.getElementById('bellPath');
+    <div id="pushNotificationPrompt" class="fixed bottom-28 right-6 z-40">
+        <button id="togglePush" 
+                class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full 
+                       hover:bg-cyan-500/40 transition-all duration-300 
+                       shadow-lg hover:shadow-cyan-500/50">
+            <svg id="bellIcon" class="w-6 h-6 text-cyan-400 transition-all" 
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path id="bellPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+        </button>
+    </div>
 
-  let registration = null;
-  let isSubscribed = false;
+    <script>
+        // Data from Flask
+        const games = {{ games|tojson }};
+        const labels = games.length > 0 ? games.map(g => g.name) : ['No games this period'];
+        const hours = games.length > 0 ? games.map(g => (g.playtime_2weeks / 60).toFixed(1)) : [1];
 
-  function urlBase64ToUint8Array(base64String) {
-      const padding = '='.repeat((4 - base64String.length % 4) % 4);
-      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-      const rawData = window.atob(base64);
-      const outputArray = new Uint8Array(rawData.length);
-      for (let i = 0; i < rawData.length; ++i) {
-          outputArray[i] = rawData.charCodeAt(i);
-      }
-      return outputArray;
-  }
+        const offset = 270; // ≈270° — purple
+        const backgroundColors = hours.length > 0 
+            ? hours.map((_, i) => `hsla(${((i * 137.508) + offset) % 360}, 80%, 65%, 0.8)`)
+            : ['#2a2a2a'];
 
-  function updateBellIcon(subscribed) {
-      isSubscribed = subscribed;
-      if (subscribed) {
-          bellIcon.innerHTML = `<path fill="currentColor" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9z"/>
-                                <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19.5 18.5L18 17h-3m-3-1v1a3 3 0 006 0v-1m-6 0h6"/>`;
-          toggleBtn.title = "Click to disable notifications";
-      } else {
-          bellIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>`;
-          toggleBtn.title = "Click to enable notifications";
-      }
-  }
+        new Chart(document.getElementById('twoWeeksChart'), {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: hours,
+                    backgroundColor: backgroundColors,
+                    borderColor: '#1f4068',
+                    borderWidth: 2,
+                    hoverOffset: 12
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#66fcf1', padding: 15, font: { size: 14 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (games.length === 0) return 'MAKE STEAM GREAT AGAIN';
+                                const value = parseFloat(context.parsed);
+                                const total = context.dataset.data.reduce((a,b) => parseFloat(a)+parseFloat(b), 0);
+                                const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
+                                return `${context.label}: ${value} h (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 
-  async function setupPush() {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-          console.warn("Push not supported");
-          return;
-      }
+    <!-- Notifications -->
+    <script>
+      const VAPID_PUBLIC_KEY = "{{ vapid_public_key | safe }}";
+      const toggleBtn = document.getElementById('togglePush');
+      const bellIcon = document.getElementById('bellIcon');
 
-      try {
-          registration = await navigator.serviceWorker.register('/static/service-worker.js');
-          console.log('SW registered');
+      let registration = null;
+      let isSubscribed = false;
 
-          // Проверка текущей подписки
-          const existingSub = await registration.pushManager.getSubscription();
-          isSubscribed = !!existingSub;
-          updateBellIcon(isSubscribed);
-
-      } catch (err) {
-          console.error('SW setup failed:', err);
-      }
-  }
-
-  toggleBtn.addEventListener('click', async () => {
-      if (!registration) {
-          alert("Service Worker not ready");
-          return;
-      }
-
-      try {
-          if (isSubscribed) {
-              const sub = await registration.pushManager.getSubscription();
-              if (sub) {
-                  await sub.unsubscribe();
-                  await fetch("/unsubscribe", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ endpoint: sub.endpoint })
-                  });
-              }
-              updateBellIcon(false);
-              alert("Notifications disabled");
-          } else {
-              const permission = await Notification.requestPermission();
-              if (permission !== "granted") {
-                  alert("Permission denied");
-                  return;
-              }
-
-              const sub = await registration.pushManager.subscribe({
-                  userVisibleOnly: true,
-                  applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-              });
-
-              await fetch("/subscribe", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(sub.toJSON())
-              });
-
-              updateBellIcon(true);
-              alert("Notifications enabled!");
+      function urlBase64ToUint8Array(base64String) {
+          const padding = '='.repeat((4 - base64String.length % 4) % 4);
+          const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+          for (let i = 0; i < rawData.length; ++i) {
+              outputArray[i] = rawData.charCodeAt(i);
           }
-      } catch (err) {
-          console.error("Push toggle error:", err);
-          alert("Error: " + err.message);
+          return outputArray;
       }
-  });
 
-  setupPush();
-</script>
+      function updateBellIcon(subscribed) {
+          isSubscribed = subscribed;
+          if (subscribed) {
+              bellIcon.innerHTML = `<path fill="currentColor" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9z"/>
+                                    <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19.5 18.5L18 17h-3m-3-1v1a3 3 0 006 0v-1m-6 0h6"/>`;
+              toggleBtn.title = "Click to disable notifications";
+          } else {
+              bellIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>`;
+              toggleBtn.title = "Click to enable notifications";
+          }
+      }
+
+      async function setupPush() {
+          if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+          try {
+              registration = await navigator.serviceWorker.register('/static/service-worker.js');
+              const existingSub = await registration.pushManager.getSubscription();
+              isSubscribed = !!existingSub;
+              updateBellIcon(isSubscribed);
+          } catch (err) { console.error('SW error:', err); }
+      }
+
+      toggleBtn.addEventListener('click', async () => {
+          if (!registration) return alert("Service Worker not ready");
+          try {
+              if (isSubscribed) {
+                  const sub = await registration.pushManager.getSubscription();
+                  if (sub) {
+                      await sub.unsubscribe();
+                      await fetch("/unsubscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+                  }
+                  updateBellIcon(false);
+                  alert("Notifications disabled");
+              } else {
+                  const permission = await Notification.requestPermission();
+                  if (permission !== "granted") return alert("Permission denied");
+                  const sub = await registration.pushManager.subscribe({
+                      userVisibleOnly: true,
+                      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                  });
+                  await fetch("/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+                  updateBellIcon(true);
+                  alert("Notifications enabled!");
+              }
+          } catch (err) {
+              console.error(err);
+              alert("Error: " + err.message);
+          }
+      });
+
+      setupPush();
+    </script>
+</body>
 </html>
