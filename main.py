@@ -1,4 +1,4 @@
-import requests, os, random, json, time, logging
+import requests, os, random, json, time, logging, pytz
 from flask import Flask, render_template, jsonify, request
 from models import db, PlayedGame, GameSnapshot, Friend, DailyStat, PushSubscription
 from dotenv import load_dotenv
@@ -34,6 +34,9 @@ STEAM_BASE = "http://api.steampowered.com/"
 STEAM_RECENTLY_PLAYED_GAMES = f"{STEAM_BASE}IPlayerService/GetRecentlyPlayedGames/v0001/"
 STEAM_FRIEND_LIST = f"{STEAM_BASE}ISteamUser/GetFriendList/v0001/"
 STEAM_PLAYER_SUMMARIES = f"{STEAM_BASE}ISteamUser/GetPlayerSummaries/v0002/"
+
+# On Railway -3
+tz_Minsk = pytz.timezone('Europe/Minsk')
 
 db.init_app(app)
 
@@ -129,7 +132,8 @@ def save_games_to_db(games_list):
         db.session.bulk_save_objects(snapshots_to_add)
     
     # Remove old snapshots    
-    non_actual_snapshots = datetime.utcnow() - timedelta(days=8)
+    non_actual_snapshots_Minsk = datetime.now(tz_Minsk) - timedelta(days=8)
+    non_actual_snapshots = non_actual_snapshots_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
     deleted_count = GameSnapshot.query.filter(
         GameSnapshot.create_at < non_actual_snapshots
     ).delete(synchronize_session='fetch')
@@ -143,11 +147,15 @@ def update_daily_stat():
     with app.app_context():
         logger.info("Starting daily statistics update.")
         
-        today = datetime.utcnow().date()
+        now_Minsk = datetime.now(tz_Minsk)
+        today = now_Minsk.date()
         yesterday = today - timedelta(days=1)
         
-        start = datetime.combine(yesterday, datetime.min.time())
-        end = datetime.combine(today, datetime.min.time())
+        start_Minsk = datetime.combine(yesterday, datetime.min.time(), tzinfo=tz_Minsk)
+        end_Minsk = datetime.combine(today, datetime.min.time(), tzinfo=tz_Minsk)
+        
+        start = start_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
+        end = end_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
         
         snapshots = GameSnapshot.query.filter(
                 GameSnapshot.create_at >= start,
@@ -337,7 +345,8 @@ scheduler.add_job(
 scheduler.add_job(
     func=update_daily_stat,
     trigger="cron",
-    hour=6, minute=40,
+    hour=9, minute=40,
+    timezone=tz_Minsk,
     id="daily_stat_job",
     replace_existing=True
 )
@@ -364,7 +373,8 @@ def _fetch_steam_playtime_cached(steamid, timestamp):
 
 @app.route('/dashboard')
 def dashboard():
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    week_ago_Minsk = datetime.now(tz_Minsk) - timedelta(days=7)
+    week_ago = week_ago_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
     
     snapshots = (
             db.session.query(
