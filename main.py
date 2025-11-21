@@ -133,7 +133,8 @@ def save_games_to_db(games_list):
     deleted_count = GameSnapshot.query.filter(
         GameSnapshot.create_at < non_actual_snapshots
     ).delete(synchronize_session='fetch')
-    logger.info(f"Removed {deleted_count} old snapshots")
+    if deleted_count > 0:
+        logger.info(f"Removed {deleted_count} old snapshots")
             
     db.session.commit()
     return {"saved": saved, "updated": updated, "deleted": deleted}
@@ -328,7 +329,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(
     func=scheduled_update,
     trigger="interval",
-    minutes=25,
+    minutes=15,
     id="steam_update",
     replace_existing=True
 )
