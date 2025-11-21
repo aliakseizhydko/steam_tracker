@@ -6,3 +6,4 @@ python-dotenv
 APScheduler
 gunicorn
 pywebpush
+Flask-Migrate
