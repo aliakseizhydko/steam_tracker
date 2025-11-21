@@ -8,8 +8,10 @@ from pywebpush import webpush, WebPushException
 from collections import defaultdict
 from sqlalchemy import func, and_, asc
 from functools import lru_cache
+from flask_migrate import Migrate
 
 app = Flask(__name__)
+migrate = Migrate(app, db)
 
 # maybe move to utils/logging_setup.py later
 logging.basicConfig(
@@ -72,6 +74,7 @@ def save_games_to_db(games_list):
     
     for g in games_list:
         name = g.get("name")
+        appid = g.get("appid")
         
         if not name:
             continue
@@ -84,6 +87,7 @@ def save_games_to_db(games_list):
         if game is None:
             game = PlayedGame(
                 name=name,
+                appid=appid,
                 play_time_2weeks=playtime_2weeks,
                 playtime_forever=playtime_forever
             )
@@ -93,6 +97,8 @@ def save_games_to_db(games_list):
             message = random.choice(phrases_for_saved).format(name)
             send_push(message)
         else:
+            #  check later
+            game.appid = appid
             game.play_time_2weeks = playtime_2weeks
             game.playtime_forever = playtime_forever
             updated += 1
@@ -383,6 +389,13 @@ def dashboard():
 
     labels = [row["name"] for row in stats_data]
     values = [row["hours"] for row in stats_data]
+    
+    single_game_cover = None
+    if len(stats_data) == 1:
+        game_name = stats_data[0]["name"]
+        game = PlayedGame.query.filter_by(name=game_name).first()
+        if game and game.appid:
+            single_game_cover = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{game.appid}/library_hero.jpg"
 
     my_total = get_steam_playtime(STEAM_ID)
     friends = Friend.query.with_entities(Friend.steamid, Friend.personaname, Friend.avatar).all()
@@ -405,6 +418,7 @@ def dashboard():
         stats=stats_data,
         labels=labels,
         values=values,
+        single_game_cover=single_game_cover,
         me=round(my_total, 1),
         comparisons=comparisons
     )

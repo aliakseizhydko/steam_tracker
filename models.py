@@ -7,6 +7,7 @@ class PlayedGame(db.Model):
     __tablename__ = 'played_games'
     
     id = db.Column(db.Integer, primary_key=True)
+    appid = db.Column(db.Integer, unique=True, nullable=True)
     name = db.Column(db.String(100), unique=True)
     play_time_2weeks = db.Column(db.Integer)
     playtime_forever = db.Column(db.Integer)
