@@ -1,89 +1,131 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steam Tracker Statistics</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='pics/icon0.png') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="static/css/style.css">
-</head>
-<body>
-  <div class="container">
-    <h1>Steam Tracker Dashboard</h1>
+{% extends "base.html" %}
 
-    <div class="section">
-      <h2>Your activity for the week</h2>
-        <div class="chart-container" id="chartWrapper">
-            {% if single_game_cover %}
-                <canvas id="statsChart" style="display: none;"></canvas>
-                <div id="singleGameCover" 
-                    style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center;">
-                    <img src="{{ single_game_cover }}" 
-                        alt="{{ stats[0].name }}" 
-                        style="width: 100%; height: 100%; object-fit: cover;">
-                </div>
+{% block title %}Steam Tracker • Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+        Steam Tracker Dashboard
+    </h1>
+
+    <!-- Weekly Activity -->
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10 mb-8">
+        <h2 class="text-2xl font-semibold mb-6 text-cyan-300 text-center">Your activity for the week</h2>
+
+      <div class="relative h-80 mx-auto max-w-md mb-8">
+          <div id="chartWrapper" class="w-full h-full">
+
+              {% if single_game_cover and stats|length == 1 %}
+                  <div class="single-game-cover 
+                              w-80 h-full mx-auto aspect-square 
+                              rounded-full overflow-hidden 
+                              ring-4 ring-cyan-400/40 
+                              shadow-2xl shadow-cyan-500/30 
+                              border-8 border-[#0f1117]
+                              bg-black">
+                      <img src="{{ single_game_cover }}" 
+                          alt="{{ stats[0].name }}" 
+                          class="w-full h-full object-cover">
+                  </div>
+
+                  <canvas id="statsChart" class="hidden"></canvas>
+
+              {% else %}
+                  <canvas id="statsChart"></canvas>
+              {% endif %}
+          </div>
+      </div>
+
+        <div class="text-center text-2xl font-bold text-cyan-200">
+            {% if stats|length == 1 and single_game_cover %}
+                <div class="text-5xl text-cyan-300">{{ stats[0].hours }} h</div>
+                <div class="text-lg mt-2 opacity-80">this week in {{ stats[0].name }}</div>
             {% else %}
-                <canvas id="statsChart"></canvas>
+                <table class="w-full mx-auto max-w-md">
+                    <thead>
+                        <tr class="text-cyan-400 border-b border-cyan-900/50">
+                            <th class="py-2 text-left">Game</th>
+                            <th class="py-2 text-right">Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in stats %}
+                        <tr class="border-b border-cyan-900/20">
+                            <td class="py-3">{{ row.name }}</td>
+                            <td class="py-3 text-right font-mono text-cyan-200">{{ row.hours }} h</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             {% endif %}
         </div>
-
-        <div id="statsInfo" style="text-align: center; margin-top: 20px; font-size: 1.4rem;">
-          {% if stats|length == 1 and single_game_cover %}
-              <div style="color: #66fcf1;">
-                  {{ stats[0].hours }} hours this week
-              </div>
-          {% else %}
-              <table>
-                  <thead><tr><th>Game</th><th>Hours added</th></tr></thead>
-                  <tbody>
-                    {% for row in stats %}
-                      <tr><td>{{ row.name }}</td><td>{{ row.hours }}</td></tr>
-                    {% endfor %}
-                  </tbody>
-              </table>
-          {% endif %}
-      </div>
     </div>
 
- <script>
+    <!-- Friends Comparison -->
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10">
+        <h2 class="text-2xl font-semibold mb-4 text-cyan-300">Comparison with friends (2 weeks)</h2>
+        <p class="text-lg mb-6">Your time: <span class="font-bold text-cyan-300">{{ me|round(1) }} h</span></p>
+
+        <div class="space-y-4">
+            {% for f in comparisons %}
+            <div class="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-cyan-500/10 transition-all">
+                <img src="{{ f.avatar }}" alt="{{ f.name }}" class="w-12 h-12 rounded-full ring-2 ring-cyan-400/30">
+                <div class="flex-1">
+                    <div class="font-medium text-cyan-200">{{ f.name }}</div>
+                    <div class="text-sm opacity-70">{{ f.friend_hours }} h played</div>
+                </div>
+                <div class="text-right">
+                    {% if f.diff > 0 %}
+                        <div class="text-red-400 font-bold">{{ f.diff }} h</div>
+                        <div class="text-xs opacity-75">less than you</div>
+                    {% elif f.diff < 0 %}
+                        <div class="text-green-400 font-bold">{{ f.diff | abs }} h</div>
+                        <div class="text-xs opacity-75"> more than you</div>
+                    {% else %}
+                        <div class="text-yellow-400 font-bold">Equal</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
     const gameLabels = {{ labels|tojson }};
     const gameHours = {{ values|tojson }};
     const hasSingleGameCover = {{ "true" if single_game_cover else "false" }};
 
-    const chartCanvas = document.getElementById('statsChart');
-    const coverDiv = document.getElementById('singleGameCover');
-    const wrapper = document.getElementById('chartWrapper');
-
-    if (hasSingleGameCover && gameHours.length === 1) {
-        chartCanvas.style.display = 'none';
-        if (coverDiv) coverDiv.style.display = 'flex';
-      
-    } else {
-        if (coverDiv) coverDiv.style.display = 'none';
-        chartCanvas.style.display = 'block';
-
-        const backgroundColors = gameHours.length > 0 ? 
-            gameHours.map((_, i) => `hsla(${(i * 137.508) % 360}, 80%, 65%, 0.8)`) : ['#2a2a2a'];
+    if (!hasSingleGameCover || gameHours.length !== 1) {
+        const backgroundColors = gameHours.map((_, i) => 
+            `hsla(${(i * 137.508) % 360}, 80%, 65%, 0.8)`
+        );
 
         new Chart(document.getElementById('statsChart'), {
             type: 'doughnut',
             data: {
-                labels: gameHours.length > 0 ? gameLabels : ['No games this week'],
+                labels: gameLabels.length > 0 ? gameLabels : ['No games this week'],
                 datasets: [{
                     data: gameHours.length > 0 ? gameHours : [1],
                     backgroundColor: backgroundColors,
-                    borderColor: '#1f4068',
-                    borderWidth: 2,
-                    hoverOffset: 10
+                    borderColor: '#0f1117',
+                    borderWidth: 3,
+                    hoverOffset: 14
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom', labels: { color: '#66fcf1', padding: 15 } },
+                    legend: { position: 'bottom', labels: { color: '#66fcf1', padding: 20 } },
                     tooltip: {
+                        backgroundColor: 'rgba(15, 17, 23, 0.95)',
+                        cornerRadius: 12,
+                        borderColor: '#06b6d4',
+                        borderWidth: 1,
                         callbacks: {
                             label: function(context) {
                                 if (gameHours.length === 0) return 'MAKE STEAM GREAT AGAIN';
@@ -99,27 +141,4 @@
         });
     }
 </script>
-
-    <div class="section">
-      <h2>Comparison with friends (2 weeks)</h2>
-      <p>Your time: {{ me|round(1) }} h</p>
-      <div class="friends">
-        {% for f in comparisons %}
-          <div class="friend">
-            <img src="{{ f.avatar }}" alt="">
-            <div style="flex:1;text-align:left;">{{ f.name }}</div>
-            <div>{{ f.friend_hours }} h</div>
-            {% if f.diff > 0 %}
-              <div class="more">+{{ f.diff }} h more</div>
-            {% elif f.diff < 0 %}
-              <div class="less">{{ f.diff }} h less</div>
-            {% else %}
-              <div>(equal)</div>
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-</body>
-</html>
+{% endblock %}
