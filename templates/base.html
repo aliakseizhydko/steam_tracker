@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='pics/icon0.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='pics/icon0.png') }}">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <title>{% block title %}{% endblock %}</title>
 </head>
 <body class="bg-[#0b0c10] text-[#66fcf1] min-h-screen pb-24">
@@ -17,8 +18,8 @@
     </main>
 
     <nav class="fixed inset-x-0 bottom-0 z-50 
-                    bg-gradient-to-t from-[#0b0c10] via-[#0b0c10] to-[#0b0c10]/90 
-                    backdrop-blur-xl border-t border-cyan-900/20
+                    bg-gradient-to-t from-[#0b0c10] via-[#0b0c10] to-[#0b0c10]/30 
+                    backdrop-blur-md border-t border-cyan-900/20
                     pb-[env(safe-area-inset-bottom)] pt-2">
         <div class="flex justify-around items-end max-w-md mx-auto px-2">
 
