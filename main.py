@@ -327,10 +327,51 @@ def save_recent():
     result = save_games_to_db(games)
     return jsonify(result)
 
-@app.route('/games')
-def show_games():
+@app.route('/week')
+def week_activity():
+    week_ago_Minsk = datetime.now(tz_Minsk) - timedelta(days=7)
+    week_ago = week_ago_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
+    
+    snapshots = (
+            db.session.query(
+                GameSnapshot.game_id,
+                func.min(GameSnapshot.playtime_forever).label('min_pt'),
+                func.max(GameSnapshot.playtime_forever).label('max_pt'),
+                PlayedGame.name
+            )
+            .join(PlayedGame, GameSnapshot.game_id == PlayedGame.id)
+            .filter(GameSnapshot.create_at >= week_ago)
+            .group_by(GameSnapshot.game_id, PlayedGame.name)
+            .all()
+        )
+    
+
+    stats_data = []
+    for _, min_pt, max_pt, name in snapshots:
+        hours = round((max_pt - min_pt) / 60, 1)
+        if hours >= 0.1:
+            stats_data.append({"name": name, "hours": hours})
+
+    stats_data.sort(key=lambda x: x["hours"], reverse=True)
+
+    labels = [row["name"] for row in stats_data]
+    values = [row["hours"] for row in stats_data]
+    
+    single_game_cover = None
+    if len(stats_data) == 1:
+        game_name = stats_data[0]["name"]
+        game = PlayedGame.query.filter_by(name=game_name).first()
+        if game and game.appid:
+            single_game_cover = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{game.appid}/library_hero.jpg"
+    
     games = PlayedGame.query.order_by(PlayedGame.id.desc()).all()
-    return render_template("games.html", games=games)
+    return render_template(
+        "week.html", 
+        stats=stats_data,
+        labels=labels,
+        values=values,
+        single_game_cover=single_game_cover,
+        games=games)
             
 scheduler = BackgroundScheduler()
 
@@ -371,43 +412,8 @@ def _fetch_steam_playtime_cached(steamid, timestamp):
     except:
         return 0.0
 
-@app.route('/dashboard')
-def dashboard():
-    week_ago_Minsk = datetime.now(tz_Minsk) - timedelta(days=7)
-    week_ago = week_ago_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
-    
-    snapshots = (
-            db.session.query(
-                GameSnapshot.game_id,
-                func.min(GameSnapshot.playtime_forever).label('min_pt'),
-                func.max(GameSnapshot.playtime_forever).label('max_pt'),
-                PlayedGame.name
-            )
-            .join(PlayedGame, GameSnapshot.game_id == PlayedGame.id)
-            .filter(GameSnapshot.create_at >= week_ago)
-            .group_by(GameSnapshot.game_id, PlayedGame.name)
-            .all()
-        )
-    
-
-    stats_data = []
-    for _, min_pt, max_pt, name in snapshots:
-        hours = round((max_pt - min_pt) / 60, 1)
-        if hours >= 0.1:
-            stats_data.append({"name": name, "hours": hours})
-
-    stats_data.sort(key=lambda x: x["hours"], reverse=True)
-
-    labels = [row["name"] for row in stats_data]
-    values = [row["hours"] for row in stats_data]
-    
-    single_game_cover = None
-    if len(stats_data) == 1:
-        game_name = stats_data[0]["name"]
-        game = PlayedGame.query.filter_by(name=game_name).first()
-        if game and game.appid:
-            single_game_cover = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{game.appid}/library_hero.jpg"
-
+@app.route('/friends')
+def friends_activity():
     my_total = get_steam_playtime(STEAM_ID)
     friends = Friend.query.with_entities(Friend.steamid, Friend.personaname, Friend.avatar).all()
 
@@ -425,11 +431,7 @@ def dashboard():
     comparisons.sort(key=lambda x: x["friend_hours"], reverse=True)
 
     return render_template(
-        "dashboard.html",
-        stats=stats_data,
-        labels=labels,
-        values=values,
-        single_game_cover=single_game_cover,
+        "friends.html",
         me=round(my_total, 1),
         comparisons=comparisons
     )

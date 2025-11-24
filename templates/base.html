@@ -11,7 +11,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <title>{% block title %}{% endblock %}</title>
 </head>
-<body class="bg-[#0b0c10] text-[#66fcf1] min-h-screen pb-24">
+<body class="bg-[#0b0c10] text-[#66fcf1] min-h-screen pb-28">
     <main class="pt-6 px-4">
         {% block content %}{% endblock %}
     </main>
@@ -34,14 +34,14 @@
             </a>
 
             <!-- Week -->
-            <a href="/games" class="group flex flex-col items-center gap-1 pb-3 pt-1 flex-1">
+            <a href="/week" class="group flex flex-col items-center gap-1 pb-3 pt-1 flex-1">
                 <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300
-                             {{ 'bg-cyan-500/20 ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' if request.path == '/games' else 'bg-white/5 group-hover:bg-cyan-500/10' }}">
-                    <svg class="w-6 h-6 transition-colors {{ 'text-cyan-400' if request.path == '/games' else 'text-gray-500 group-hover:text-cyan-300' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             {{ 'bg-cyan-500/20 ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' if request.path == '/week' else 'bg-white/5 group-hover:bg-cyan-500/10' }}">
+                    <svg class="w-6 h-6 transition-colors {{ 'text-cyan-400' if request.path == '/week' else 'text-gray-500 group-hover:text-cyan-300' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                 </div>
-                <span class="text-xs font-medium transition-colors {{ 'text-cyan-400' if request.path == '/games' else 'text-gray-500 group-hover:text-cyan-300' }}">Week</span>
+                <span class="text-xs font-medium transition-colors {{ 'text-cyan-400' if request.path == '/week' else 'text-gray-500 group-hover:text-cyan-300' }}">Week</span>
             </a>
 
             <!-- Achievements -->
@@ -57,14 +57,14 @@
             </a>
 
             <!-- Friends -->
-            <a href="/dashboard" class="group flex flex-col items-center gap-1 pb-3 pt-1 flex-1">
+            <a href="/friends" class="group flex flex-col items-center gap-1 pb-3 pt-1 flex-1">
                 <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300
-                             {{ 'bg-cyan-500/20 ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' if request.path == '/dashboard' else 'bg-white/5 group-hover:bg-cyan-500/10' }}">
-                    <svg class="w-6 h-6 transition-colors {{ 'text-cyan-400' if request.path == '/dashboard' else 'text-gray-500 group-hover:text-cyan-300' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             {{ 'bg-cyan-500/20 ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' if request.path == '/friends' else 'bg-white/5 group-hover:bg-cyan-500/10' }}">
+                    <svg class="w-6 h-6 transition-colors {{ 'text-cyan-400' if request.path == '/friends' else 'text-gray-500 group-hover:text-cyan-300' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                     </svg>
                 </div>
-                <span class="text-xs font-medium transition-colors {{ 'text-cyan-400' if request.path == '/dashboard' else 'text-gray-500 group-hover:text-cyan-300' }}">Friends</span>
+                <span class="text-xs font-medium transition-colors {{ 'text-cyan-400' if request.path == '/friends' else 'text-gray-500 group-hover:text-cyan-300' }}">Friends</span>
             </a>
 
             <!-- Profile -->

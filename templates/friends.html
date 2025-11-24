@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Steam Tracker • Friends{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+        Friends Activity
+    </h1>
+    
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10">
+        <h2 class="text-2xl font-semibold mb-4 text-cyan-300">Comparison with friends (2 weeks)</h2>
+        <p class="text-lg mb-6">Your time: <span class="font-bold text-cyan-300">{{ me|round(1) }} h</span></p>
+
+        <div class="space-y-4">
+            {% for f in comparisons %}
+            <div class="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-cyan-500/10 transition-all">
+                <img src="{{ f.avatar }}" alt="{{ f.name }}" class="w-12 h-12 rounded-full ring-2 ring-cyan-400/30">
+                <div class="flex-1">
+                    <div class="font-medium text-cyan-200">{{ f.name }}</div>
+                    <div class="text-sm opacity-70">{{ f.friend_hours }} h played</div>
+                </div>
+                <div class="text-right">
+                    {% if f.diff > 0 %}
+                        <div class="text-red-400 font-bold">{{ f.diff }} h</div>
+                        <div class="text-xs opacity-75">less than you</div>
+                    {% elif f.diff < 0 %}
+                        <div class="text-green-400 font-bold">{{ f.diff | abs }} h</div>
+                        <div class="text-xs opacity-75"> more than you</div>
+                    {% else %}
+                        <div class="text-white-400 font-bold">Equal</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
