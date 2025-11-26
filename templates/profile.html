@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Steam Tracker • Profile{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-screen px-4">
+
+    <div class="text-center">
+
+        <div class="mb-16">
+            <div class="text-9xl animate-spin-slow">
+                ⚙️
+            </div>
+        </div>
+
+        <h1 class="text-6xl md:text-7xl font-black tracking-tighter mb-8">
+            <span class="inline-block bg-gradient-to-r from-cyan-400 via-cyan-300 to-purple-500 bg-clip-text text-transparent
+                         animate-pulse glitch" data-text="BUILDING">
+                BUILDING
+            </span>
+        </h1>
+
+        <p class="text-cyan-400 text-lg font-medium opacity-80">
+            something legendary...
+        </p>
+
+    </div>
+</div>
+
+<style>
+.glitch { position: relative; animation: glitch 4s infinite; }
+.glitch::before, .glitch::after {
+    content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+}
+.glitch::before {
+    animation: glitch-top 1.5s infinite; clip-path: polygon(0 0, 100% 0, 100% 40%, 0 60%);
+    transform: translate(-2px); color: #ff00ff;
+}
+.glitch::after {
+    animation: glitch-bottom 1.8s infinite; clip-path: polygon(0 65%, 100% 20%, 100% 100%, 0 100%);
+    transform: translate(2px); color: #00ffff;
+}
+@keyframes glitch      { 0%,100%{transform:translate(0)} 20%{transform:translate(-3px,3px)} 40%{transform:translate(3px,-2px)} 60%{transform:translate(-2px,2px)} 80%{transform:translate(2px,-3px)} }
+@keyframes glitch-top    { 0%,100%{transform:translate(0)} 50%{transform:translate(-4px,-2px)} }
+@keyframes glitch-bottom { 0%,100%{transform:translate(0)} 50%{transform:translate(4px,2px)} }
+
+.animate-spin-slow {
+    animation: spin 8s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

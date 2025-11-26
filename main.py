@@ -373,6 +373,12 @@ def week_activity():
         single_game_cover=single_game_cover,
         games=games)
             
+@app.route('/achievements')
+def achievements():
+    return render_template(
+        "achievements.html"
+    )
+
 scheduler = BackgroundScheduler()
 
 scheduler.add_job(
@@ -434,6 +440,12 @@ def friends_activity():
         "friends.html",
         me=round(my_total, 1),
         comparisons=comparisons
+    )
+    
+@app.route('/profile')
+def profile():
+    return render_template(
+        "profile.html"
     )
 
 @app.route('/subscribe', methods=['POST'])
