@@ -1,5 +1,5 @@
 import requests, os, random, json, time, logging, pytz
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, g
 from models import db, PlayedGame, GameSnapshot, Friend, DailyStat, PushSubscription
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 from pywebpush import webpush, WebPushException
 from collections import defaultdict
 from sqlalchemy import func, and_, asc
-from functools import lru_cache
 from flask_migrate import Migrate
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 migrate = Migrate(app, db)
@@ -267,10 +267,6 @@ def update_friends():
     db.session.commit()
     return f"Updated {count} friends"
 
-def get_steam_playtime(steamid):
-    cache_key_time = int(time.time() // 600) * 600
-    return _fetch_steam_playtime_cached(steamid, cache_key_time)
-
 def send_push(body):
     subscriptions = PushSubscription.query.all()
     if not subscriptions:
@@ -403,34 +399,61 @@ def update_friends_route():
     result = update_friends()
     return result
 
-@lru_cache(maxsize=128)
-def _fetch_steam_playtime_cached(steamid, timestamp):
-    params = {
-        "key": STEAM_API_KEY,
-        "steamid": steamid,
-        "format": "json"
-    }
-    try:
-        r = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params, timeout=10)
-        r.raise_for_status()
-        games = r.json().get("response", {}).get("games", [])
-        return sum(g.get("playtime_2weeks", 0) for g in games) / 60
-    except:
-        return 0.0
+_PLAYTIME_CACHE = {}
+CACHE_TTL = 8 * 60
+
+def get_steam_playtime_batch(steamids):
+    if not steamids:
+        return {}
+
+    def fetch_one(steamid):
+        try:
+            params = {
+                "key": STEAM_API_KEY,
+                "steamid": steamid,
+            }
+            r = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params, timeout=12)
+            if r.status_code != 200:
+                return steamid, 0.0
+            data = r.json().get("response", {}).get("games", [])
+            total_min = sum(g.get("playtime_2weeks", 0) for g in data)
+            return steamid, round(total_min / 60, 1)
+        except:
+            return steamid, 0,0
+        
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        results = dict(executor.map(fetch_one, steamids))
+        
+    now = time.time()
+    for sid, hours in results.items():
+        _PLAYTIME_CACHE[sid] = (hours, now)
+    
+    return results
+
+def get_steam_playtime_cached_or_fresh(steamid):
+    cached = _PLAYTIME_CACHE.get(steamid)
+    if cached and time.time() - cached[1] < CACHE_TTL:
+        return cached[0]
+    
+    hours = get_steam_playtime_batch([steamid]).get(steamid, 0.0)
+    return hours
 
 @app.route('/friends')
 def friends_activity():
-    my_total = get_steam_playtime(STEAM_ID)
+    my_total = get_steam_playtime_cached_or_fresh(STEAM_ID)
     friends = Friend.query.with_entities(Friend.steamid, Friend.personaname, Friend.avatar).all()
+    friend_ids = [f.steamid for f in friends]
+    
+    batch_results = get_steam_playtime_batch(friend_ids + [STEAM_ID])
 
     comparisons = []
     for friend in friends:
-        friend_hours = get_steam_playtime(friend.steamid)
+        friend_hours = batch_results.get(friend.steamid, 0.0)
         diff = round(my_total - friend_hours, 1)
         comparisons.append({
             "name": friend.personaname,
             "avatar": friend.avatar,
-            "friend_hours": round(friend_hours, 1),
+            "friend_hours": friend_hours,
             "diff": diff
         })
     
