@@ -8,3 +8,4 @@ gunicorn
 pywebpush
 Flask-Migrate
 pytz
+Flask-Caching

@@ -9,6 +9,7 @@ from collections import defaultdict
 from sqlalchemy import func, and_, asc
 from flask_migrate import Migrate
 from concurrent.futures import ThreadPoolExecutor
+from flask_caching import Cache
 
 app = Flask(__name__)
 migrate = Migrate(app, db)
@@ -26,7 +27,11 @@ load_dotenv()
 app.config.update(
     SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    CACHE_TYPE='simple',
+    CACHE_DEFAULT_TIMEOUT=600
 )
+
+cache= Cache(app)
 
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 STEAM_ID = os.getenv("STEAM_ID")
@@ -303,6 +308,7 @@ def home():
     return render_template("index.html", vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
 
 @app.route('/api/recent-games')
+@cache.cached(timeout=600)
 def api_recent_games():
     params = {
         "key": STEAM_API_KEY,
@@ -335,6 +341,7 @@ def save_recent():
     return jsonify(result)
 
 @app.route('/api/week-activity')
+@cache.cached(timeout=600)
 def api_week_activity():
     week_ago_Minsk = datetime.now(tz_Minsk) - timedelta(days=7)
     week_ago = week_ago_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
@@ -463,6 +470,7 @@ def get_steam_playtime_cached_or_fresh(steamid):
     return hours
 
 @app.route('/api/friends/activity')
+@cache.cached(timeout=600)
 def friends_activity_api():
     my_total = get_steam_playtime_cached_or_fresh(STEAM_ID)
     friends = Friend.query.with_entities(Friend.steamid, Friend.personaname, Friend.avatar).all()
