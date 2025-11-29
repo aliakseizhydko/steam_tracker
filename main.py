@@ -300,14 +300,25 @@ def send_push(body):
 
 @app.route('/')
 def home():
+    return render_template("index.html", vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
+
+@app.route('/api/recent-games')
+def api_recent_games():
     params = {
         "key": STEAM_API_KEY,
         "steamid": STEAM_ID,
         "format": "json"
     }
-    response = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params)
-    games = response.json().get("response", {}).get("games", [])
-    return render_template("index.html", games=games, vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
+    try:
+        response = requests.get(STEAM_RECENTLY_PLAYED_GAMES, params=params)
+        if response.status_code != 200:
+            return jsonify([])
+        
+        games = response.json().get("response", {}).get("games", [])
+        return jsonify(games)
+    except Exception as e:
+        logger.error(f"Error fetching recent games: {e}")
+        return jsonify([])
 
 @app.route('/save_recent')
 def save_recent():
@@ -323,8 +334,8 @@ def save_recent():
     result = save_games_to_db(games)
     return jsonify(result)
 
-@app.route('/week')
-def week_activity():
+@app.route('/api/week-activity')
+def api_week_activity():
     week_ago_Minsk = datetime.now(tz_Minsk) - timedelta(days=7)
     week_ago = week_ago_Minsk.astimezone(pytz.utc).replace(tzinfo=None)
     
@@ -333,20 +344,20 @@ def week_activity():
                 GameSnapshot.game_id,
                 func.min(GameSnapshot.playtime_forever).label('min_pt'),
                 func.max(GameSnapshot.playtime_forever).label('max_pt'),
-                PlayedGame.name
+                PlayedGame.name,
+                PlayedGame.appid
             )
             .join(PlayedGame, GameSnapshot.game_id == PlayedGame.id)
             .filter(GameSnapshot.create_at >= week_ago)
-            .group_by(GameSnapshot.game_id, PlayedGame.name)
+            .group_by(GameSnapshot.game_id, PlayedGame.name, PlayedGame.appid)
             .all()
         )
     
-
     stats_data = []
-    for _, min_pt, max_pt, name in snapshots:
+    for _, min_pt, max_pt, name, appid in snapshots:
         hours = round((max_pt - min_pt) / 60, 1)
         if hours >= 0.1:
-            stats_data.append({"name": name, "hours": hours})
+            stats_data.append({"name": name, "hours": hours, "appid": appid})
 
     stats_data.sort(key=lambda x: x["hours"], reverse=True)
 
@@ -355,19 +366,32 @@ def week_activity():
     
     single_game_cover = None
     if len(stats_data) == 1:
-        game_name = stats_data[0]["name"]
-        game = PlayedGame.query.filter_by(name=game_name).first()
+        game = PlayedGame.query.filter_by(name=stats_data[0]["name"]).first()
         if game and game.appid:
             single_game_cover = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{game.appid}/library_hero.jpg"
-    
+            
     games = PlayedGame.query.order_by(PlayedGame.id.desc()).all()
-    return render_template(
-        "week.html", 
-        stats=stats_data,
-        labels=labels,
-        values=values,
-        single_game_cover=single_game_cover,
-        games=games)
+
+    games_list = [
+        {
+            "id": g.id,
+            "name": g.name,
+            "play_time_2weeks": g.play_time_2weeks,
+            "playtime_forever": g.playtime_forever
+        } for g in games
+    ]
+
+    return jsonify({
+        "stats": stats_data,
+        "labels": labels,
+        "values": values,
+        "single_game_cover": single_game_cover,
+        "games": games_list
+    })
+
+@app.route('/week')
+def week_activity():
+    return render_template("week.html")
             
 @app.route('/achievements')
 def achievements():
@@ -438,8 +462,8 @@ def get_steam_playtime_cached_or_fresh(steamid):
     hours = get_steam_playtime_batch([steamid]).get(steamid, 0.0)
     return hours
 
-@app.route('/friends')
-def friends_activity():
+@app.route('/api/friends/activity')
+def friends_activity_api():
     my_total = get_steam_playtime_cached_or_fresh(STEAM_ID)
     friends = Friend.query.with_entities(Friend.steamid, Friend.personaname, Friend.avatar).all()
     friend_ids = [f.steamid for f in friends]
@@ -459,11 +483,14 @@ def friends_activity():
     
     comparisons.sort(key=lambda x: x["friend_hours"], reverse=True)
 
-    return render_template(
-        "friends.html",
-        me=round(my_total, 1),
-        comparisons=comparisons
-    )
+    return jsonify({
+        "me": round(my_total, 1),
+        "comparisons": comparisons
+    })
+    
+@app.route('/friends')
+def friends_activity():
+    return render_template("friends.html")
     
 @app.route('/profile')
 def profile():

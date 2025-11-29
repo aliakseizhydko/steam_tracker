@@ -8,102 +8,49 @@
         Steam Statistics
     </h1>
 
-    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10">
-        <h2 class="text-2xl font-semibold mb-6 text-cyan-300 text-center">Games played in the last 2 weeks</h2>
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10 min-h-[400px]">
+        <h2 class="text-2xl font-semibold mb-6 text-cyan-300 text-center">Your activity for 2 weeks</h2>
 
-        <div class="chart-container relative h-80 mb-8">
-            <canvas id="twoWeeksChart"></canvas>
+        <div id="loadingIndicator" class="text-center py-12">
+            <div class="loader-pulse mx-auto"></div> 
+            <p class="mt-6 text-cyan-400 opacity-80 text-lg">Loading recent activity...</p>
         </div>
 
-        {% if games|length == 0 %}
-            <div class="text-center py-12 text-3xl font-bold text-cyan-400/70">
-                No games played in the last 2 weeks<br>
-                <span class="text-5xl mt-4 block text-cyan-300">MAKE STEAM GREAT AGAIN</span>
+        <div id="contentContainer" class="hidden opacity-0 transition-opacity duration-500">
+            
+            <div class="chart-container relative h-80 mb-8">
+                <canvas id="twoWeeksChart"></canvas>
             </div>
-        {% else %}
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b-2 border-cyan-900/50">
-                            <th class="py-3 px-2 text-cyan-300 font-semibold">Game</th>
-                            <th class="py-3 px-2 text-right text-cyan-300 font-semibold">Hours</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for game in games %}
-                        <tr class="border-b border-cyan-900/20 hover:bg-cyan-500/5 transition">
-                            <td class="py-4 px-2">{{ game.name }}</td>
-                            <td class="py-4 px-2 text-right font-mono text-cyan-200">
-                                {{ (game.playtime_2weeks / 60)|round(1) }} h
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endif %}
+
+            <div id="gamesTableContainer"></div>
+        </div>
+    </div>
+
+    <div id="pushNotificationPrompt" class="fixed bottom-28 right-6 z-40">
+        <button id="togglePush" 
+                class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full 
+                       hover:bg-cyan-500/40 transition-all duration-300 
+                       shadow-lg hover:shadow-cyan-500/50">
+            <svg id="bellIcon" class="w-6 h-6 text-cyan-400 transition-all" 
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path id="bellPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+        </button>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="{{ url_for('static', filename='js/modules/push-notifications.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/index.js') }}"></script>
+
 <script>
-    const games = {{ games|tojson }};
-    const labels = games.length > 0 ? games.map(g => g.name) : ['No games this period'];
-    const hours = games.length > 0 ? games.map(g => (g.playtime_2weeks / 60).toFixed(1)) : [1];
-
-    const offset = 270;
-    const backgroundColors = hours.length > 0 
-        ? hours.map((_, i) => `hsla(${((i * 137.508) + offset) % 360}, 80%, 65%, 0.8)`)
-        : ['#1a1a2e'];
-
-    new Chart(document.getElementById('twoWeeksChart'), {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: hours,
-                backgroundColor: backgroundColors,
-                borderColor: '#0f1117',
-                borderWidth: 3,
-                hoverOffset: 16
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#66fcf1',
-                        padding: 20,
-                        font: { size: 14, family: "'Inter', sans-serif" },
-                        pointStyle: 'rectRounded',
-                        usePointStyle: true
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(15, 17, 23, 0.95)',
-                    titleColor: '#66fcf1',
-                    bodyColor: '#e0fbfc',
-                    borderColor: '#06b6d4',
-                    borderWidth: 1,
-                    cornerRadius: 12,
-                    displayColors: true,
-                    callbacks: {
-                        label: function(context) {
-                            if (games.length === 0) return 'MAKE STEAM GREAT AGAIN';
-                            const value = parseFloat(context.parsed);
-                            const total = context.dataset.data.reduce((a,b) => parseFloat(a)+parseFloat(b), 0);
-                            const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
-                            return `${context.label}: ${value} h (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
+    document.addEventListener("DOMContentLoaded", () => {
+        const vapidKey = "{{ vapid_public_key | safe }}";
+        new PushNotificationManager(vapidKey, 'togglePush', 'bellIcon');
     });
 </script>
 {% endblock %}
