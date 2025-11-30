@@ -1,13 +1,58 @@
 const CACHE_KEY = 'friendsActivityCache';
-const CACHE_DURATION_MS = 30 * 60 * 1000; 
-
-document.addEventListener("DOMContentLoaded", () => {
-    fetchAndCacheFriendsActivity();
-});
+const CACHE_DURATION_MS = 30 * 60 * 1000;
 
 const loadingIndicator = document.getElementById("loadingIndicator");
 const myTimePlaceholder = document.getElementById("myTimePlaceholder");
 const friendsListContainer = document.getElementById("friendsListContainer");
+
+document.addEventListener("DOMContentLoaded", () => {
+    const cachedRaw = localStorage.getItem(CACHE_KEY);
+    if (cachedRaw) {
+        try {
+            const cached = JSON.parse(cachedRaw);
+            renderData(cached.data);
+            console.log('Data taken from cache');
+        } catch (e) {
+            console.error('Failed to parse cache: ', e);
+        }
+    }
+
+    updateFriendsData();
+});
+
+async function updateFriendsData() {
+    if (!localStorage.getItem(CACHE_KEY)) {
+        friendsListContainer.style.display = "none";
+        loadingIndicator.style.display = "block";
+    }
+
+    try {
+        const response = await fetch("/api/friends/activity");
+        if (!response.ok) throw new Error("Network error");
+
+        const data = await response.json();
+
+        const newCache = {
+            data: data,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
+
+        renderData(data);
+        console.log('Data updated');
+    } catch (err) {
+        console.error("Friends API error:", err);
+
+        if (!localStorage.getItem(CACHE_KEY)) {
+            loadingIndicator.innerHTML = `
+                <p class="text-red-400 text-lg">Failed to load :(</p>
+                <button onclick="location.reload()" class="mt-4 px-5 py-2 bg-cyan-500/20 rounded-xl hover:bg-cyan-500/30 transition">
+                    Try again
+                </button>
+            `;
+        }
+    }
+}
 
 function renderFriendItem(friend) {
     let diffHtml;
@@ -44,61 +89,4 @@ function renderData(data) {
 
     loadingIndicator.style.display = "none";
     friendsListContainer.style.display = "block";
-}
-
-
-function fetchAndCacheFriendsActivity() {
-    const cachedData = localStorage.getItem(CACHE_KEY);
-
-    if (cachedData) {
-        try {
-            const cache = JSON.parse(cachedData);
-            const now = new Date().getTime();
-
-            if (now < cache.timestamp + CACHE_DURATION_MS) {
-                console.log('Loading friends data from cache (valid).');
-                renderData(cache.data); 
-                return;
-            } else {
-                console.log('Cache expired. Fetching new data.');
-            }
-        } catch (e) {
-            console.error('Error parsing cached data, fetching fresh data:', e);
-            localStorage.removeItem(CACHE_KEY);
-        }
-    }
-    
-    friendsListContainer.style.display = "none";
-    loadingIndicator.style.display = "block";
-    
-    fetch("/api/friends/activity")
-        .then(response => {
-            if (!response.ok) throw new Error("Network error");
-            return response.json();
-        })
-        .then(data => {
-            const newCache = {
-                data: data,
-                timestamp: new Date().getTime()
-            };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
-
-            console.log('Fresh data fetched and cached.');
-            renderData(data);
-        })
-        .catch(err => {
-            console.error("Friends API error:", err);
-            loadingIndicator.innerHTML = `
-                <p class="text-red-400 text-lg">Failed to load friends</p>
-                <button onclick="location.reload()" class="mt-4 px-5 py-2 bg-cyan-500/20 rounded-xl hover:bg-cyan-500/30 transition">Try Again</button>
-            `;
-            if (cachedData) {
-                 const cache = JSON.parse(cachedData);
-                 renderData(cache.data); 
-                 loadingIndicator.style.display = "none";
-                 console.log('Displaying expired data due to network error.');
-            } else {
-                 friendsListContainer.style.display = "none";
-            }
-        });
 }
