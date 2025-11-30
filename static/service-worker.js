@@ -1,11 +1,13 @@
-const CACHE_VERSION = 'core-v4';
+const CACHE_VERSION = 'core-v5';
 const STATIC_CACHE_NAME = CACHE_VERSION + '_static';
 const API_CACHE_NAME = CACHE_VERSION + '_api';
 
 const coreAssets = [
     '/',
-    '/friends',
     '/week',
+    '/achievements',
+    '/friends',
+    '/profile',
     '/static/manifest.json',
     '/static/css/components/loaders.css',
     '/static/pics/icon0.png',
@@ -43,32 +45,36 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
-    const path = url.pathname;
 
-    const isHtmlRoute = coreAssets.includes(path) && event.request.method === 'GET';
-    const isStaticAsset = path.startsWith('/static/');
-    
-    if (isHtmlRoute || isStaticAsset || coreAssets.includes(event.request.url)) {
+    if (url.origin !== location.origin) return;
+    if (url.pathname.startsWith('/api/')) return;
+    if (url.pathname.startsWith('/static/service-worker')) return;
+
+    if (event.request.mode === 'navigate') {
         event.respondWith(
-            caches.match(event.request).then(response => {
-                if (response) {
-                    return response;
+            caches.match(event.request).then(cachedResponse => {
+                if (cachedResponse) {
+                    return cachedResponse;
                 }
-
                 return fetch(event.request).then(networkResponse => {
-                    if (networkResponse.status === 200) {
-                        const responseToCache = networkResponse.clone();
+                    if (networkResponse.ok) {
                         caches.open(STATIC_CACHE_NAME).then(cache => {
-                            cache.put(event.request, responseToCache);
+                            cache.put(event.request, networkResponse.clone());
                         });
                     }
                     return networkResponse;
-                }).catch(error => {
-                    console.error('Fetch error:', error);
                 });
+            }).catch(() => {
+                return caches.match('/');
             })
         );
         return;
+    }
+
+    if (url.pathname.startsWith('/static/') || coreAssets.some(asset => url.pathname === asset || url.href === asset)) {
+        event.respondWith(
+            caches.match(event.request).then(response => response || fetch(event.request))
+        );
     }
 });
 
