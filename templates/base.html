@@ -11,6 +11,31 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/loaders.css') }}">
     <title>{% block title %}{% endblock %}</title>
+    <style>@view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: subtle-fade-out 0.2s ease-in-out;
+        }
+
+        ::view-transition-new(root) {
+            animation: subtle-fade-in 0.2s ease-in-out;
+        }
+
+        @keyframes subtle-fade-out {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        @keyframes subtle-fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .view-content {
+            transition: opacity 0.2s ease-in-out;
+        }</style>
 </head>
 <body class="bg-[#0b0c10] text-[#66fcf1] min-h-screen pb-28">
     <main class="pt-6 px-4">

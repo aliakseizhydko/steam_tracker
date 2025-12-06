@@ -219,7 +219,7 @@ def update_daily_stat():
         db.session.commit()
         
         logger.info(f"Daily stat updated for {yesterday}. Total hours: {total_hours}")  
-
+        
 def scheduled_update():
     with app.app_context():
         logger.info("Starting automatic updates...")
@@ -303,9 +303,18 @@ def send_push(body):
         except WebPushException as e:
             logger.warning(f"Push notification failed for endpoint {sub.endpoint[:60]}.")
 
+@app.route("/")
+def index():
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("index.html", _fragment=True)
+    return render_template("index.html")
+
 @app.route('/')
 def home():
-    return render_template("index.html", vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
+    vapid = os.getenv("VAPID_PUBLIC_KEY")
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("index.html", _fragment=True, vapid_public_key=vapid)
+    return render_template("index.html", vapid_public_key=vapid)
 
 @app.route('/api/recent-games')
 @cache.cached(timeout=600)
@@ -398,13 +407,15 @@ def api_week_activity():
 
 @app.route('/week')
 def week_activity():
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("week.html", _fragment=True)
     return render_template("week.html")
             
 @app.route('/achievements')
 def achievements():
-    return render_template(
-        "achievements.html"
-    )
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("achievements.html", _fragment=True)
+    return render_template("achievements.html")
 
 scheduler = BackgroundScheduler()
 
@@ -498,13 +509,15 @@ def friends_activity_api():
     
 @app.route('/friends')
 def friends_activity():
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("friends.html", _fragment=True)
     return render_template("friends.html")
     
 @app.route('/profile')
 def profile():
-    return render_template(
-        "profile.html"
-    )
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("profile.html", _fragment=True)
+    return render_template("profile.html")
 
 @app.route('/subscribe', methods=['POST'])
 def subscribe():

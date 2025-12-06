@@ -21,9 +21,16 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function updateFriendsData() {
-    if (!localStorage.getItem(CACHE_KEY)) {
-        friendsListContainer.style.display = "none";
-        loadingIndicator.style.display = "block";
+const cachedRaw = localStorage.getItem(CACHE_KEY);
+    if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+            console.log('Data is fresh, skipping API call.');
+            if (friendsListContainer.style.display === "none") {
+                renderData(cached.data);
+            }
+            return; 
+        }
     }
 
     try {

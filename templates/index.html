@@ -1,3 +1,53 @@
+{% if _fragment %}
+<div id="view-home" class="view-content" style="display:none; opacity:0;">
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+        Steam Statistics
+    </h1>
+
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10 min-h-[400px]">
+        <h2 class="text-2xl font-semibold mb-6 text-cyan-300 text-center">Your activity for 2 weeks</h2>
+
+        <div id="loadingIndicator" class="text-center py-12">
+            <div class="loader-pulse mx-auto"></div> 
+            <p class="mt-6 text-cyan-400 opacity-80 text-lg">Loading recent activity...</p>
+        </div>
+
+        <div id="contentContainer" class="hidden opacity-0 transition-opacity duration-500">
+            
+            <div class="chart-container relative h-80 mb-8">
+                <canvas id="twoWeeksChart"></canvas>
+            </div>
+
+            <div id="gamesTableContainer"></div>
+        </div>
+    </div>
+
+    <div id="pushNotificationPrompt" class="fixed bottom-28 right-6 z-40">
+        <button id="togglePush" 
+                class="p-3 bg-cyan-500/20 backdrop-blur-md border border-cyan-500 rounded-full 
+                       hover:bg-cyan-500/40 transition-all duration-300 
+                       shadow-lg hover:shadow-cyan-500/50">
+            <svg id="bellIcon" class="w-6 h-6 text-cyan-400 transition-all" 
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path id="bellPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+        </button>
+    </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/modules/push-notifications.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/index.js') }}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const vapidKey = "{{ vapid_public_key | safe }}";
+        new PushNotificationManager(vapidKey, 'togglePush', 'bellIcon');
+    });
+</script>
+{% else %}
 {% extends "base.html" %}
 
 {% block title %}Steam Tracker • Recent{% endblock %}
@@ -43,10 +93,8 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script src="{{ url_for('static', filename='js/modules/push-notifications.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/index.js') }}"></script>
-
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const vapidKey = "{{ vapid_public_key | safe }}";
@@ -54,3 +102,4 @@
     });
 </script>
 {% endblock %}
+{% endif %}

@@ -1,3 +1,40 @@
+{% if _fragment %}
+<div id="view-week" class="view-content" style="display:none; opacity:0;">
+<div class="max-w-2xl mx-auto">
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10 mb-8">
+        <h2 class="text-2xl font-semibold mb-6 text-cyan-300 text-center">Your activity for the week</h2>
+
+        <div id="loadingIndicator" class="text-center py-12">
+            <div class="loader-pulse mx-auto"></div>
+            <p class="mt-6 text-cyan-400 opacity-80 text-lg">Loading weekly activity...</p>
+        </div>
+
+        <div id="chartContainer" class="relative h-80 mx-auto max-w-md mb-8" style="display: none;">
+            <div id="chartWrapper" class="w-full h-full">
+                </div>
+        </div>
+
+        <div id="statsListContainer" class="text-center text-2xl font-bold text-cyan-200" style="display: none;">
+            </div>
+
+    </div>
+
+    <div class="mt-12 max-w-2xl mx-auto" id="debug-raw-data-container" style="display: none;">
+        <details class="bg-black/40 backdrop-blur border border-cyan-900/30 rounded-2xl">
+            <summary class="cursor-pointer px-5 py-3 text-cyan-400 hover:text-cyan-300 text-sm font-medium select-none">
+                Raw games data
+            </summary>
+            
+            <div id="rawDataTable" class="p-4 max-h-96 overflow-y-auto">
+                </div>
+        </details>
+    </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/pages/week.js') }}" defer></script>
+{% else %}
 {% extends "base.html" %}
 
 {% block title %}Steam Tracker • Weekly Activity{% endblock %}
@@ -36,6 +73,7 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/pages/week.js') }}" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/pages/week.js') }}" defer></script>
 {% endblock %}
+{% endif %}

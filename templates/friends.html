@@ -1,3 +1,28 @@
+{% if _fragment %}
+<div id="view-friends" class="view-content" style="display:none; opacity:0;">
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+        Friends Activity
+    </h1>
+    
+    <div class="bg-[#0f1117]/80 backdrop-blur-xl rounded-3xl border border-cyan-900/30 p-6 shadow-2xl shadow-cyan-500/10">
+        
+        <p class="text-lg mb-6">Your time: <span class="font-bold text-cyan-300" id="myTimePlaceholder">loading...</span></p>
+
+        <div id="loadingIndicator" class="text-center py-12">
+            <div class="loader-pulse mx-auto"></div>
+            <p class="mt-6 text-cyan-400 opacity-80 text-lg">Loading friends activity...</p>
+        </div>
+        
+        <div class="space-y-4" id="friendsListContainer" style="display: none;">
+        </div>
+
+    </div>
+</div>
+</div>
+
+<script src="{{ url_for('static', filename='js/pages/friends.js') }}" defer></script>
+{% else %}
 {% extends "base.html" %}
 
 {% block title %}Steam Tracker • Friends{% endblock %}
@@ -25,5 +50,6 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="{{ url_for('static', filename='js/pages/friends.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/pages/friends.js') }}" defer></script>
 {% endblock %}
+{% endif %}
