@@ -545,6 +545,26 @@ if os.getenv("RUN_SCHEDULER", "false").lower() in ("1", "true", "yes"):
     scheduler.start()
     logger.info("Background scheduler enabled and started.")
 
+@app.route('/api/page/index')
+def api_page_index():
+    return render_template('pages/index_content.html', vapid_public_key=os.getenv("VAPID_PUBLIC_KEY"))
+
+@app.route('/api/page/week')
+def api_page_week():
+    return render_template('pages/week_content.html')
+
+@app.route('/api/page/friends')
+def api_page_friends():
+    return render_template('pages/friends_content.html')
+
+@app.route('/api/page/achievements')
+def api_page_achievements():
+    return render_template('pages/achievements_content.html')
+
+@app.route('/api/page/profile')
+def api_page_profile():
+    return render_template('pages/profile_content.html')
+
 if __name__ == "__main__":
         
     app.run(
